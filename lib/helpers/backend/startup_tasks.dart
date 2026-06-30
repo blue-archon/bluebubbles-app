@@ -237,6 +237,11 @@ class StartupTasks {
     Logger.info("Registering ChatsService, SocketService, and NotificationsService...");
     GetIt.I.registerSingleton<ChatsService>(ChatsService());
     GetIt.I.registerSingleton<SocketService>(SocketService());
+
+    Logger.info("Registering TypingIndicatorService...");
+    GetIt.I.registerSingleton<TypingIndicatorService>(TypingIndicatorService());
+    Logger.info("TypingIndicatorService ready");
+
     await _waitForInterop(notifications: true);
 
     GetIt.I.registerSingleton<EventDispatcher>(EventDispatcher());
