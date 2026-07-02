@@ -159,7 +159,6 @@ dependencies:
   sprung: ^3.0.1
   store_checker: ^1.8.0
   synchronized: ^3.3.0+3
-  system_tray: ^2.0.3
   supercharged: ^2.1.1
   system_info2: ^4.0.0
   tenor_flutter: ^1.0.3 # Pinned because of flutter SDK
