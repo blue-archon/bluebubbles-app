@@ -33,7 +33,6 @@ import 'package:get/get.dart';
 import 'package:google_ml_kit/google_ml_kit.dart' hide Message;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:local_notifier/local_notifier.dart';
 import 'package:path/path.dart' as p;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:screen_retriever/screen_retriever.dart';
@@ -531,8 +530,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver, TrayListener {
         await initSystemTray();
         trayManager.addListener(this);
 
-        /* ----- NOTIFICATIONS INITIALIZATION ----- */
-        await localNotifier.setup(appName: "BlueBubbles");
+        // Desktop notifications are initialized in NotificationsService.init().
       }
 
       if (!SettingsSvc.settings.finishedSetup.value) {

@@ -18,7 +18,7 @@ import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart' hide Message;
 import 'package:get/get.dart';
-import 'package:local_notifier/local_notifier.dart';
+import 'package:bluebubbles/services/backend/notifications/desktop_notification.dart';
 import 'package:path/path.dart';
 import 'package:synchronized/synchronized.dart';
 import 'package:timezone/timezone.dart';
@@ -163,10 +163,10 @@ class NotificationsService {
   bool headless = false;
 
   /// For desktop use only
-  static LocalNotification? failedToast;
-  static LocalNotification? aliasesToast;
-  static Map<String, LocalNotification> facetimeNotifications = {};
-  static Map<String, LocalNotification> activeToasts = {};
+  static DesktopNotification? failedToast;
+  static DesktopNotification? aliasesToast;
+  static Map<String, DesktopNotification> facetimeNotifications = {};
+  static Map<String, DesktopNotification> activeToasts = {};
   static Map<String, Timer> debounceTimers = {};
   static Map<String, List<PendingToastItem>> pendingMessages = {};
   static final Lock _lock = Lock();
@@ -202,6 +202,26 @@ class NotificationsService {
           Logger.warn('IntentsService not registered, cannot process notification launch payload');
         }
       }
+    }
+
+    if (kIsDesktop && !headless) {
+      // flutter_local_notifications replaces local_notifier on desktop. One
+      // shared plugin plus a single response router (DesktopNotification) fans
+      // taps/actions back out to each notification's callbacks.
+      await flnp.initialize(
+        settings: InitializationSettings(
+          linux: const LinuxInitializationSettings(defaultActionName: 'Open'),
+          windows: const WindowsInitializationSettings(
+            appName: 'BlueBubbles',
+            appUserModelId: 'com.bluebubbles.messaging',
+            // Stable GUID identifying the app to the Windows notification platform.
+            guid: 'c7e6c9a2-3b1f-4e8a-9d5c-2f7b6a4e1d90',
+          ),
+          macOS: const DarwinInitializationSettings(),
+        ),
+        onDidReceiveNotificationResponse: DesktopNotification.handleResponse,
+      );
+      DesktopNotification.registerPlugin(flnp);
     }
   }
 
@@ -386,8 +406,8 @@ class NotificationsService {
   Future<void> showPersistentDesktopFaceTimeNotif(
       String? callUuid, String caller, Uint8List? avatar, bool isAudio) async {
     List<String> actions = ["Answer", "Ignore"];
-    List<LocalNotificationAction> nActions = actions.map((String a) => LocalNotificationAction(text: a)).toList();
-    LocalNotification? toast;
+    List<DesktopNotificationAction> nActions = actions.map((String a) => DesktopNotificationAction(text: a)).toList();
+    DesktopNotification? toast;
     String? path;
 
     if (avatar != null) {
@@ -400,15 +420,16 @@ class NotificationsService {
       }
     }
 
-    toast = LocalNotification(
-      type: LocalNotificationType.imageAndText02,
+    toast = DesktopNotification(
+      type: DesktopNotificationType.imageAndText02,
       imagePath: path,
       title: caller,
       body: "Incoming FaceTime ${isAudio ? 'Audio' : 'Video'} Call",
-      duration: LocalNotificationDuration.long,
-      actions: callUuid == null ? null : nActions,
-      systemSound: LocalNotificationSound.call,
-      soundOption: LocalNotificationSoundOption.loop,
+      duration: DesktopNotificationDuration.long,
+      actions: callUuid == null ? const <DesktopNotificationAction>[] : nActions,
+      systemSound: DesktopNotificationSound.call,
+      soundOption: DesktopNotificationSoundOption.loop,
+      persistent: true,
     );
 
     toast.onClick = () async {
@@ -427,12 +448,9 @@ class NotificationsService {
       };
     }
 
-    toast.onClose = (reason) async {
-      if (reason == LocalNotificationCloseReason.timedOut && faceTimeOverlays.containsKey(callUuid)) {
-        await toast?.show();
-      }
-    };
-
+    // The notification is persistent (resident on Linux, incomingCall scenario
+    // on Windows), so it stays visible until answered/ignored/cleared without
+    // needing a re-show on timeout (flnp exposes no dismiss callback anyway).
     if (facetimeNotifications[callUuid ?? caller] != null) {
       await facetimeNotifications[callUuid ?? caller]?.close();
     }
@@ -545,7 +563,7 @@ class NotificationsService {
         .toList();
 
     bool showMarkRead = actions.contains("Mark Read");
-    List<LocalNotificationAction> nActions = actions.map((String a) => LocalNotificationAction(text: a)).toList();
+    List<DesktopNotificationAction> nActions = actions.map((String a) => DesktopNotificationAction(text: a)).toList();
 
     activeToasts[guid]?.close();
 
@@ -556,25 +574,26 @@ class NotificationsService {
       displayTitle = title;
     }
 
-    final LocalNotification toast = LocalNotification(
-      type: LocalNotificationType.imageAndText03,
+    final DesktopNotification toast = DesktopNotification(
+      type: DesktopNotificationType.imageAndText03,
       imagePath: path,
       title: displayTitle,
       body: body,
       attributionText: overflowCount > 0 ? "+$overflowCount earlier message${overflowCount > 1 ? "s" : ""}\n" : null,
-      duration: LocalNotificationDuration.long,
+      duration: DesktopNotificationDuration.long,
       actions: numMessages > 1
           ? showMarkRead
-              ? [LocalNotificationAction(text: "Mark $numMessages Messages Read")]
+              ? [DesktopNotificationAction(text: "Mark $numMessages Messages Read")]
               : []
           : nActions,
       hasInput: SettingsSvc.settings.showReplyField.value,
       inputPlaceholder: "Type a reply...",
       inputButtonText: "Reply",
-      systemSound: LocalNotificationSound.sms,
+      systemSound: DesktopNotificationSound.sms,
       soundOption: SettingsSvc.settings.desktopNotificationSoundPath.value != null
-          ? LocalNotificationSoundOption.silent
-          : LocalNotificationSoundOption.defaultOption,
+          ? DesktopNotificationSoundOption.silent
+          : DesktopNotificationSoundOption.defaultOption,
+      showOpenAction: true,
     );
 
     activeToasts[guid] = toast;
@@ -584,19 +603,30 @@ class NotificationsService {
     await playDesktopNotificationSound();
 
     await toast.show();
+
+    if (isTemporaryFile) {
+      // flnp exposes no "dismissed" callback, so temp avatars dismissed without
+      // interaction are cleaned on a timer as a fallback.
+      Future.delayed(const Duration(seconds: 60), () => _deleteTempFile(path));
+    }
   }
 
   int _estimateLines(String text) {
     return (text.length / charsPerLineEst).ceil() + "\n".allMatches(text).length;
   }
 
-  void _attachToastHandlers(LocalNotification toast, Chat chat, Message message, String avatarPath,
+  void _attachToastHandlers(DesktopNotification toast, Chat chat, Message message, String avatarPath,
       List<String> actions, bool multipleMessages,
       {bool deleteFileOnClose = true}) {
     toast.onClick = () async {
       _cleanNotificationState(chat.guid);
-      await _openChat(chat);
       await windowManager.show();
+      // Canonical chat-open path (same as conversation tiles / mobile notif taps):
+      // seeds ChatState and navigates. The old _openChat only navigated when the
+      // chat was *already* active, so clicking a notification never opened it.
+      if (GetIt.I.isRegistered<IntentsService>()) {
+        await IntentsSvc.openChat(chat.guid);
+      }
       if (deleteFileOnClose) {
         _deleteTempFile(avatarPath);
       }
@@ -655,7 +685,7 @@ class NotificationsService {
     };
 
     toast.onClose = (reason) async {
-      if (reason != LocalNotificationCloseReason.unknown) {
+      if (reason != DesktopNotificationCloseReason.unknown) {
         _cleanNotificationState(chat.guid);
       }
 
@@ -667,16 +697,6 @@ class NotificationsService {
 
   void _cleanNotificationState(String guid) {
     activeToasts.remove(guid);
-  }
-
-  Future<void> _openChat(Chat chat) async {
-    if (ChatsSvc.isChatActive(chat.guid) && Get.context != null) {
-      NavigationSvc.pushAndRemoveUntil(
-        Get.context!,
-        ConversationView(chat: chat),
-        (route) => route.isFirst,
-      );
-    }
   }
 
   Future<void> _deleteTempFile(String path) async {
@@ -721,8 +741,8 @@ class NotificationsService {
         await aliasesToast?.close();
       }
 
-      aliasesToast = LocalNotification(
-        type: LocalNotificationType.text02,
+      aliasesToast = DesktopNotification(
+        type: DesktopNotificationType.text02,
         title: title,
         body: text,
         actions: [],
@@ -764,8 +784,8 @@ class NotificationsService {
     final title = 'Failed to send${scheduled ? " scheduled" : ""} message';
     final subtitle = scheduled ? 'Tap to open scheduled messages list' : 'Tap to see more details or retry';
     if (kIsDesktop) {
-      failedToast = LocalNotification(
-        type: LocalNotificationType.text02,
+      failedToast = DesktopNotification(
+        type: DesktopNotificationType.text02,
         title: title,
         body: subtitle,
         actions: [],
