@@ -51,7 +51,9 @@ class _NotificationPanelState extends State<NotificationPanel> with SingleTicker
                     child: Text("Notifications".psCapitalize, style: iOS ? iosSubtitle : materialSubtitle),
                   )),
             SettingsSection(backgroundColor: tileColor, children: [
-              if (!kIsWeb)
+              // DND override is Android-only (bypasses the OS Do Not Disturb via a
+              // method channel); hide it on desktop/web where it has no effect.
+              if (!kIsWeb && !kIsDesktop)
                 Obx(() => SettingsSwitch(
                       onChanged: (bool val) async {
                         SettingsSvc.settings.dndFavoritesOverride.value = val;
@@ -64,7 +66,7 @@ class _NotificationPanelState extends State<NotificationPanel> with SingleTicker
                       isThreeLine: true,
                       backgroundColor: tileColor,
                     )),
-              if (!kIsWeb) const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
+              if (!kIsWeb && !kIsDesktop) const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
               if (!kIsWeb)
                 Obx(() => SettingsSwitch(
                       onChanged: (bool val) async {
