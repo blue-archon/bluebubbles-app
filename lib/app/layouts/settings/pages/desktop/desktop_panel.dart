@@ -234,6 +234,25 @@ class _DesktopPanelState extends State<DesktopPanel> with ThemeHelpers {
                       )),
                   Obx(() => AnimatedSizeAndFade.showHide(
                         show: SettingsSvc.settings.desktopNotifications.value,
+                        child: SettingsSwitch(
+                          onChanged: (bool val) async {
+                            SettingsSvc.settings.desktopNotificationSoundEnabled.value = val;
+                            await SettingsSvc.settings.saveOneAsync('desktopNotificationSoundEnabled');
+                          },
+                          initialVal: SettingsSvc.settings.desktopNotificationSoundEnabled.value,
+                          title: "Notification Sound",
+                          subtitle: "Play a sound for new-message notifications. Turn off for silent notifications.",
+                          backgroundColor: tileColor,
+                          leading: const SettingsLeadingIcon(
+                            iosIcon: CupertinoIcons.volume_up,
+                            materialIcon: Icons.volume_up_outlined,
+                            containerColor: Colors.orange,
+                          ),
+                        ),
+                      )),
+                  Obx(() => AnimatedSizeAndFade.showHide(
+                        show: SettingsSvc.settings.desktopNotifications.value &&
+                            SettingsSvc.settings.desktopNotificationSoundEnabled.value,
                         child: SettingsTile(
                           leading: const SettingsLeadingIcon(
                             iosIcon: CupertinoIcons.folder,

@@ -590,7 +590,10 @@ class NotificationsService {
       inputPlaceholder: "Type a reply...",
       inputButtonText: "Reply",
       systemSound: DesktopNotificationSound.sms,
-      soundOption: SettingsSvc.settings.desktopNotificationSoundPath.value != null
+      // Silent when the user turned notification sound off, or when a custom sound
+      // is set (the custom file is played separately by playDesktopNotificationSound).
+      soundOption: (!SettingsSvc.settings.desktopNotificationSoundEnabled.value ||
+              SettingsSvc.settings.desktopNotificationSoundPath.value != null)
           ? DesktopNotificationSoundOption.silent
           : DesktopNotificationSoundOption.defaultOption,
       showOpenAction: true,
@@ -711,6 +714,7 @@ class NotificationsService {
   }
 
   Future<void> playDesktopNotificationSound() async {
+    if (!SettingsSvc.settings.desktopNotificationSoundEnabled.value) return;
     if (SettingsSvc.settings.desktopNotificationSoundPath.value != null) {
       _desktopNotificationPlayer?.dispose();
       final player = Player();

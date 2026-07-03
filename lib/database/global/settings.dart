@@ -161,6 +161,7 @@ class Settings {
   final RxBool desktopNotifications = true.obs;
   final RxInt desktopNotificationSoundVolume = 100.obs;
   final RxnString desktopNotificationSoundPath = RxnString();
+  final RxBool desktopNotificationSoundEnabled = true.obs;
 
   // Troubleshooting settings
   final Rx<Level> logLevel = Level.info.obs;
@@ -390,6 +391,7 @@ class Settings {
       'windowEffectCustomOpacityDark': windowEffectCustomOpacityDark.value,
       'desktopNotifications': desktopNotifications.value,
       'desktopNotificationSoundVolume': desktopNotificationSoundVolume.value,
+      'desktopNotificationSoundEnabled': desktopNotificationSoundEnabled.value,
       'useDesktopAccent': useDesktopAccent.value,
       'logLevel': logLevel.value.index,
       'hideNamesForReactions': hideNamesForReactions.value,
@@ -643,6 +645,8 @@ class Settings {
         map['desktopNotificationSoundVolume'] ?? SettingsSvc.settings.desktopNotificationSoundVolume.value;
     SettingsSvc.settings.desktopNotificationSoundPath.value =
         map['desktopNotificationSoundPath'] ?? SettingsSvc.settings.desktopNotificationSoundPath.value;
+    SettingsSvc.settings.desktopNotificationSoundEnabled.value =
+        map['desktopNotificationSoundEnabled'] ?? SettingsSvc.settings.desktopNotificationSoundEnabled.value;
     SettingsSvc.settings.useDesktopAccent.value =
         map['useDesktopAccent'] ?? map['useWindowsAccent'] ?? SettingsSvc.settings.useDesktopAccent.value;
     SettingsSvc.settings.firstFcmRegisterDate.value =
@@ -805,6 +809,7 @@ class Settings {
     s.desktopNotifications.value = map['desktopNotifications'] ?? true;
     s.desktopNotificationSoundVolume.value = map['desktopNotificationSoundVolume'] ?? 100;
     s.desktopNotificationSoundPath.value = map['desktopNotificationSoundPath'];
+    s.desktopNotificationSoundEnabled.value = map['desktopNotificationSoundEnabled'] ?? true;
     s.useDesktopAccent.value = map['useDesktopAccent'] ?? map['useWindowsAccent'] ?? false;
     s.firstFcmRegisterDate.value = map['firstFcmRegisterDate'] ?? 0;
     s.logLevel.value = map['logLevel'] != null ? Level.values[map['logLevel']] : Level.info;
