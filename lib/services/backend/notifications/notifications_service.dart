@@ -349,7 +349,12 @@ class NotificationsService {
     if (chat.shouldMuteNotification(message)) return;
     if (!headless && LifecycleSvc.isAlive) {
       if (ChatsSvc.isChatActive(chat.guid)) return;
-      if (ChatsSvc.activeChat == null &&
+      // The "on the chat list" suppression is a mobile behaviour — there the list
+      // is the full foreground screen. On desktop, notifications are expected to
+      // fire regardless of window width or whether a chat pane is open, so a
+      // shrunk (single-pane) window shouldn't silence them. Mobile only.
+      if (!kIsDesktop &&
+          ChatsSvc.activeChat == null &&
           Get.rawRoute?.settings.name == "/" &&
           !SettingsSvc.settings.notifyOnChatList.value) {
         return;
