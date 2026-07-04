@@ -1,6 +1,8 @@
-# BlueBubbles — Community Fork (v2.0.0+85)
+# BlueBubbles — Community Fork (hardened baseline)
 
-> **This is an unofficial community fork** of [BlueBubblesApp/bluebubbles-app](https://github.com/BlueBubblesApp/bluebubbles-app) based on **v2.0.0+85 (beta 8)**. It adds two feature tracks and fixes several bugs found in that release. It is not affiliated with or endorsed by the BlueBubbles project.
+> **This is an unofficial community fork** of [BlueBubblesApp/bluebubbles-app](https://github.com/BlueBubblesApp/bluebubbles-app). It is based on **v2.0.0+85 (beta 8)** and tracks upstream `development` (last merged **2026-06-25**, `8bcf15cf`). On top of that baseline it adds the feature tracks and fixes documented below. It is not affiliated with or endorsed by the BlueBubbles project.
+>
+> **Prebuilt binaries** (Android APK, Linux desktop) are published on this fork's [Releases page](https://github.com/blue-archon/bluebubbles-app/releases). The desktop-hardening changes have also been offered upstream as PRs [#3068](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3068)–[#3072](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3072).
 
 ---
 
@@ -59,6 +61,32 @@ In the original code, a notification for an incoming group message was silently 
 - **`sync_actions.dart`:** Embedded `handle` maps inside message payloads are now extracted during the pre-processing pass and added to the `handlesByAddress` lookup, so bulk sync can resolve senders that were not previously seen.
 
 **Additional fix in `message_state.dart`:** A null sender on an *incoming* message now shows `'Unknown'` instead of `'You'`, preventing falsely attributing unresolved incoming messages to the local user.
+
+---
+
+### Feature 4: Messaging Reliability — No More Silently Lost Outbound Messages
+
+Two independent defects could make a sent message vanish with no error bubble, no retry, and no trace (typically surfacing on Android after backgrounding the app, especially in group chats):
+
+- **Isolate drain cancelled on resume/new work** (`global_isolate.dart`, `lifecycle_service.dart`): on Android, backgrounding the app arms a graceful shutdown ("drain") of the background isolate that does all DB work. Returning to the foreground never disarmed it — the isolate would still stop at the first quiet moment and any send racing that window failed. Now any new request, or the app resuming, cancels the pending drain and hands shutdown back to the normal idle timer. (Upstream later addressed part of this by accepting sends during a drain — `d63131e52`, merged here — but the drain itself still fired under active use; this fork disarms it.)
+- **Outgoing queue prep-phase resilience** (`outgoing_message_handler.dart`): the send pipeline's *prep* phase (writing the temp message to the DB) had no error handling — the only failure recovery lived in the later dispatch phase. A prep failure escaped the fire-and-forget `queue()` call and the message was silently dropped: never queued, never sent, never marked failed. Now prep failures are retried while safe (temp record not yet saved — no duplicate risk) and otherwise surfaced as a failed/retryable message bubble. A message can no longer disappear silently.
+
+---
+
+### Feature 5: Desktop Hardening (Linux-validated)
+
+A consolidation pass over the desktop platform-integration layer — fewer forked/duplicated plugins, several user-facing fixes:
+
+| Change | What it fixes / improves |
+|---|---|
+| **Linux window-close fix** | `secure_application` (no Linux support) made the window unclosable on Linux; it is now bypassed there. |
+| **Tray consolidation** | Two tray plugins (`system_tray` + `tray_manager`) doing the same job → one (`tray_manager`); −67 lines, one fewer native dep. |
+| **Notifications de-fork** | Desktop notifications moved off the stagnant `local_notifier` fork onto `flutter_local_notifications` (already used on mobile) behind a small app-owned adapter. Also fixes click-to-open (previously only worked if the chat was already active). |
+| **Notification sound toggle** | New "Notification Sound" switch: system sound / custom sound file / silent popup. |
+| **Narrow-layout notification fix** | The mobile-only "on the chat list" suppression fired whenever no chat pane was open — i.e. always, in the shrunk single-pane window — silently dropping all notifications. Now mobile-only. |
+| **Dead Tenor GIF picker removed** | Google discontinued the public Tenor API (keys blocked 2026-01-13, sunset 2026-06-30); the button was dead for everyone. Button + dependency removed. |
+
+These six changes are the ones offered upstream as PRs #3068–#3072.
 
 ---
 
@@ -144,20 +172,27 @@ An additional wrinkle: the Mac can store the same phone number in two forms (e.g
 
 ---
 
+## Installing from this fork's Releases
+
+- **Android (APK):** the APK is signed with this fork's own key, so it **cannot be installed over the official BlueBubbles app** — uninstall the official app first (this deletes its local data; your messages live on the server and re-sync). Use the `prod` flavor APK; it uses the same package id (`com.bluebubbles.messaging`).
+- **Linux desktop:** an Arch/pacman package (`.pkg.tar.zst`) is attached to releases (installs to `/opt/bluebubbles` with a menu entry; per-user data stays in `~/.local/share/app.bluebubbles.BlueBubbles/`). Other distros: use the bundle tarball or build from source.
+- **Windows / macOS:** no prebuilt binaries — build from source below.
+
 ## Building
 
 This is a Flutter application. Requirements:
 
 - Flutter SDK (see `.flutter-version` or `pubspec.yaml` for the required version)
 - Android SDK with NDK 27.0, target SDK 35, Java/Kotlin 21
-- A connected Android device or emulator
+- A connected Android device or emulator (for the Android app)
 
 ```bash
 flutter pub get
-flutter run --release   # or: flutter build apk --release
+flutter run --release        # Android: or flutter build apk --release --flavor prod
+flutter build linux --release  # Linux desktop
 ```
 
-No new dependencies were added. All changes are within the existing dependency graph.
+The desktop work *removes* dependencies (`system_tray`, `local_notifier`, `tenor_flutter`); no new ones were added.
 
 ---
 
