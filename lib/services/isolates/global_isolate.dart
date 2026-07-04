@@ -32,7 +32,13 @@ class GlobalIsolate {
   /// Timer for tracking isolate inactivity
   Timer? _idleTimer;
 
-  /// Timeout duration for individual task requests
+  /// Watchdog timeout for individual task requests. When a request exceeds
+  /// this, the isolate is presumed wedged (alive but stuck — e.g. a blocked
+  /// DB transaction): the request errors, all other pending requests are
+  /// failed, and the isolate is killed so the next operation restarts it
+  /// fresh. Without this, one hung action silently freezes every
+  /// isolate-dependent feature (sends, message loads) until the process dies.
+  /// [Duration.zero] disables the watchdog.
   final Duration taskTimeout;
 
   /// Timeout duration for isolate startup
@@ -64,7 +70,7 @@ class GlobalIsolate {
   String get isolateDebugName => 'GlobalIsolate';
 
   GlobalIsolate({
-    this.taskTimeout = Duration.zero,
+    this.taskTimeout = const Duration(minutes: 2),
     this.startupTimeout = const Duration(seconds: 30),
     this.idleTimeout = const Duration(minutes: 5),
   });
@@ -348,16 +354,34 @@ class GlobalIsolate {
     final requestId = const Uuid().v4();
     final completer = Completer<T>();
 
-    // Set up timeout if not disabled (zero duration means no timeout)
+    // Watchdog: if not disabled (zero duration means no watchdog), a request
+    // exceeding the timeout marks the whole isolate as wedged, not just the
+    // one request — an alive-but-stuck isolate otherwise hangs every caller
+    // forever (there is no other detection: _verifyIsolateAlive only checks
+    // handles, and the idle timer refuses to fire while requests are pending).
     Timer? timer;
-    if ((customTimeout ?? taskTimeout) != Duration.zero) {
-      timer = Timer(customTimeout ?? taskTimeout, () {
+    final effectiveTimeout = customTimeout ?? taskTimeout;
+    if (effectiveTimeout != Duration.zero) {
+      timer = Timer(effectiveTimeout, () {
         if (_pendingRequests.containsKey(requestId)) {
           final requestInfo = _pendingRequests.remove(requestId)!;
+          final stuckTypes = _pendingRequests.values.map((r) => r.type.name).join(', ');
+          Logger.error(
+            '$isolateDebugName watchdog: [${type.name}] exceeded ${effectiveTimeout.inSeconds}s — '
+            'isolate presumed wedged. Restarting it and failing ${_pendingRequests.length} other pending '
+            'request(s)${stuckTypes.isEmpty ? '' : ' [$stuckTypes]'}. '
+            'If this repeats back-to-back, a native deadlock is likely holding the DB.',
+          );
           if (!requestInfo.completer.isCompleted) {
-            requestInfo.completer.completeError('Request timeout after ${customTimeout ?? taskTimeout}');
+            requestInfo.completer.completeError(
+              '$isolateDebugName watchdog: ${type.name} timed out after ${effectiveTimeout.inSeconds}s '
+              '(isolate wedged; restarted)',
+            );
           }
-          _maybeStopAfterDrain();
+          // Kill the wedged isolate. stop() error-completes the remaining
+          // pending requests and resets state; the next operation restarts
+          // the isolate lazily via _ensureStarted().
+          stop();
         }
       });
     }
