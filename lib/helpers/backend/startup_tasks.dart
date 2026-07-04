@@ -231,14 +231,13 @@ class StartupTasks {
     GetIt.I.registerSingleton<HandleService>(HandleService());
     HandleSvc.init();
 
-    Logger.info("Registering ChatsService, SocketService, and NotificationsService...");
+    Logger.info("Registering ChatsService, TypingIndicatorService, and SocketService...");
     GetIt.I.registerSingleton<ChatsService>(ChatsService());
+    // Must be registered before SocketService (upstream e934a9733) — and exactly
+    // once: the fork's own registration and upstream's move of it were combined
+    // by the 2026-07 development merge into a startup-crashing duplicate.
     GetIt.I.registerSingleton<TypingIndicatorService>(TypingIndicatorService());
     GetIt.I.registerSingleton<SocketService>(SocketService());
-
-    Logger.info("Registering TypingIndicatorService...");
-    GetIt.I.registerSingleton<TypingIndicatorService>(TypingIndicatorService());
-    Logger.info("TypingIndicatorService ready");
 
     await _waitForInterop(notifications: true);
 
