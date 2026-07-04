@@ -253,8 +253,8 @@ class GlobalIsolate {
   }
 
   /// Requests graceful shutdown:
-  /// - rejects new fire-and-forget [broadcast] calls; a new [send] cancels the
-  ///   drain instead (a pending message means the app is active again)
+  /// - [broadcast] calls are still accepted during the drain; a new [send]
+  ///   cancels the drain instead (a pending message means the app is active again)
   /// - stops the isolate once all in-flight requests complete (or immediately if none)
   ///
   /// Returns a Future that completes when the isolate has fully stopped.
@@ -377,10 +377,6 @@ class GlobalIsolate {
 
   /// Fire-and-forget send (no response expected)
   void broadcast(IsolateRequestType type, dynamic input) {
-    if (_shutdownPending) {
-      Logger.warn('$isolateDebugName is shutting down; broadcast $type rejected');
-      return;
-    }
     _ensureStarted().then((_) {
       _scheduleIdleShutdown();
 
