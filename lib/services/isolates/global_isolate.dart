@@ -4,8 +4,10 @@ import 'dart:ui';
 
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/helpers/backend/startup_tasks.dart';
+import 'package:bluebubbles/services/backend/notifications/notifications_service.dart';
 import 'package:bluebubbles/services/isolates/isolate_actions.dart';
 import 'package:bluebubbles/services/isolates/isolate_event.dart';
+import 'package:get_it/get_it.dart';
 import 'package:uuid/uuid.dart';
 
 /// A base isolate manager for handling background tasks
@@ -31,6 +33,11 @@ class GlobalIsolate {
 
   /// Timer for tracking isolate inactivity
   Timer? _idleTimer;
+
+  /// Last time the request watchdog fired. Two fires close together mean the
+  /// wedge is store-wide (a leaked/blocked write lock outside this isolate) —
+  /// restarting isolates won't clear it, only a full app restart will.
+  DateTime? _lastWatchdogFire;
 
   /// Watchdog timeout for individual task requests. When a request exceeds
   /// this, the isolate is presumed wedged (alive but stuck — e.g. a blocked
@@ -215,7 +222,17 @@ class GlobalIsolate {
 
     // Unregister the named port when stopping
     IsolateNameServer.removePortNameMapping(isolatePortName);
-    _isolate?.kill(priority: Isolate.immediate);
+    // Ask the isolate to exit cooperatively instead of Isolate.kill():
+    // kill() cannot interrupt a thread blocked in a native call (e.g. an
+    // ObjectBox write-lock wait). Killing a blocked WAITER leaves a zombie
+    // that can later ACQUIRE the write lock and then die mid-transaction —
+    // permanently leaking the store's process-wide write mutex. The shutdown
+    // message is processed whenever the isolate unblocks; until then it is
+    // simply abandoned (ports closed, references dropped) and a fresh
+    // isolate takes over on the next operation.
+    try {
+      _sendPort?.send({'__shutdown__': true});
+    } catch (_) {}
     _receivePort?.close();
     _receivePort = null;
     _exitPort?.close();
@@ -378,9 +395,22 @@ class GlobalIsolate {
               '(isolate wedged; restarted)',
             );
           }
-          // Kill the wedged isolate. stop() error-completes the remaining
-          // pending requests and resets state; the next operation restarts
-          // the isolate lazily via _ensureStarted().
+          // Two fires close together = the fresh isolate wedged too, so the
+          // blockage is store-wide (write lock held outside this isolate).
+          // Isolate restarts cannot clear that — tell the user to restart.
+          final now = DateTime.now();
+          final isRepeat = _lastWatchdogFire != null && now.difference(_lastWatchdogFire!) < const Duration(minutes: 10);
+          _lastWatchdogFire = now;
+          if (isRepeat) {
+            Logger.error(
+              '$isolateDebugName watchdog fired twice within 10 minutes — store-wide write wedge; '
+              'only a full app restart releases the write lock.',
+            );
+            unawaited(_notifyDatabaseStuck());
+          }
+          // Abandon the wedged isolate. stop() error-completes the remaining
+          // pending requests, asks the isolate to exit cooperatively (no
+          // kill — see stop()), and the next operation spawns a fresh one.
           stop();
         }
       });
@@ -477,6 +507,18 @@ class GlobalIsolate {
           Logger.error('Error in event listener for ${eventMessage.type.name}: $e', trace: stack);
         }
       }
+    }
+  }
+
+  /// Surfaces a "restart the app" notification when the watchdog detects a
+  /// store-wide write wedge. Best-effort — never throws.
+  Future<void> _notifyDatabaseStuck() async {
+    try {
+      if (GetIt.I.isRegistered<NotificationsService>()) {
+        await GetIt.I<NotificationsService>().createDatabaseStuckNotification();
+      }
+    } catch (e) {
+      Logger.warn('Failed to show database-stuck notification: $e');
     }
   }
 
@@ -609,6 +651,12 @@ class GlobalIsolate {
     await initServices(rootIsolateToken);
 
     receivePort.listen((message) async {
+      // Cooperative shutdown (sent by the manager instead of Isolate.kill so a
+      // natively-blocked isolate finishes its in-flight call before exiting).
+      if (message is Map && message['__shutdown__'] == true) {
+        receivePort.close();
+        Isolate.exit();
+      }
       if (message is! Map<String, dynamic>) return;
 
       final isolateRequest = IsolateRequest.fromMap(message);
