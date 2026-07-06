@@ -474,10 +474,13 @@ class GlobalIsolate {
     if (message is Map<String, dynamic>) {
       // Init-stage progress reports, logged on the main engine so they are
       // flush-safe even if the isolate itself never gets to write its log.
+      // Debug level keeps baseline logs quiet; the watchdog's ERROR line
+      // carries _lastInitStage regardless, so a wedge still names its stage
+      // at any log level.
       final initStage = message['__init_stage__'];
       if (initStage is String) {
         _lastInitStage = initStage;
-        Logger.info('$isolateDebugName init stage: $initStage');
+        Logger.debug('$isolateDebugName init stage: $initStage');
         return;
       }
 
