@@ -4,7 +4,9 @@ import 'dart:ui';
 
 import 'package:bluebubbles/utils/logger/logger.dart';
 import 'package:bluebubbles/helpers/backend/startup_tasks.dart';
+import 'package:bluebubbles/services/backend/filesystem/filesystem_service.dart';
 import 'package:bluebubbles/services/backend/notifications/notifications_service.dart';
+import 'package:bluebubbles/services/backend/settings/shared_preferences_service.dart';
 import 'package:bluebubbles/services/isolates/isolate_actions.dart';
 import 'package:bluebubbles/services/isolates/isolate_event.dart';
 import 'package:get_it/get_it.dart';
@@ -38,6 +40,11 @@ class GlobalIsolate {
   /// wedge is store-wide (a leaked/blocked write lock outside this isolate) —
   /// restarting isolates won't clear it, only a full app restart will.
   DateTime? _lastWatchdogFire;
+
+  /// Latest init-stage report from the spawned isolate. 'done' = init
+  /// completed and the request listener is live; anything else at watchdog
+  /// time means the generation was stillborn at that init stage.
+  String? _lastInitStage;
 
   /// Watchdog timeout for individual task requests. When a request exceeds
   /// this, the isolate is presumed wedged (alive but stuck — e.g. a blocked
@@ -153,9 +160,19 @@ class GlobalIsolate {
       // action map via the defaultActionMap parameter inside the spawned isolate,
       // which avoids any cross-isolate serialisation of function closures/typedefs.
       final rootToken = RootIsolateToken.instance;
+      // Hand the isolate everything it would otherwise fetch via platform
+      // channels — see buildIsolateHandoff(). Best-effort: a null handoff
+      // falls back to the old (channel-calling) init path.
+      Map<String, dynamic>? handoff;
+      try {
+        handoff = buildIsolateHandoff();
+      } catch (e) {
+        Logger.warn('$isolateDebugName: failed to build isolate handoff, falling back to platform channels: $e');
+      }
+      _lastInitStage = 'spawning';
       _isolate = await Isolate.spawn(
         getIsolateEntryPoint as void Function(List<dynamic>),
-        [_receivePort!.sendPort, rootToken],
+        [_receivePort!.sendPort, rootToken, handoff],
         debugName: isolateDebugName,
         onExit: _exitPort!.sendPort,
         onError: _errorPort!.sendPort,
@@ -382,12 +399,16 @@ class GlobalIsolate {
       timer = Timer(effectiveTimeout, () {
         if (_pendingRequests.containsKey(requestId)) {
           final requestInfo = _pendingRequests.remove(requestId)!;
-          final stuckTypes = _pendingRequests.values.map((r) => r.type.name).join(', ');
+          final nowTs = DateTime.now();
+          final stuckTypes = _pendingRequests.values
+              .map((r) => '${r.type.name}(+${nowTs.difference(r.issuedAt).inSeconds}s)')
+              .join(', ');
           Logger.error(
             '$isolateDebugName watchdog: [${type.name}] exceeded ${effectiveTimeout.inSeconds}s — '
-            'isolate presumed wedged. Restarting it and failing ${_pendingRequests.length} other pending '
+            'isolate presumed wedged (init stage: ${_lastInitStage ?? 'unknown'}). '
+            'Restarting it and failing ${_pendingRequests.length} other pending '
             'request(s)${stuckTypes.isEmpty ? '' : ' [$stuckTypes]'}. '
-            'If this repeats back-to-back, a native deadlock is likely holding the DB.',
+            'If this repeats back-to-back, the blockage is outside this isolate.',
           );
           if (!requestInfo.completer.isCompleted) {
             requestInfo.completer.completeError(
@@ -416,7 +437,7 @@ class GlobalIsolate {
       });
     }
 
-    _pendingRequests[requestId] = _RequestInfo(completer: completer, timer: timer, type: type);
+    _pendingRequests[requestId] = _RequestInfo(completer: completer, timer: timer, type: type, issuedAt: DateTime.now());
 
     // Reset idle shutdown when new work is queued.
     _scheduleIdleShutdown();
@@ -451,6 +472,15 @@ class GlobalIsolate {
     }
 
     if (message is Map<String, dynamic>) {
+      // Init-stage progress reports, logged on the main engine so they are
+      // flush-safe even if the isolate itself never gets to write its log.
+      final initStage = message['__init_stage__'];
+      if (initStage is String) {
+        _lastInitStage = initStage;
+        Logger.info('$isolateDebugName init stage: $initStage');
+        return;
+      }
+
       // Check if this is an event message
       if (message.containsKey('event')) {
         try {
@@ -508,6 +538,26 @@ class GlobalIsolate {
         }
       }
     }
+  }
+
+  /// Values the isolate needs that would otherwise require platform-channel
+  /// plugin calls from inside the isolate (path_provider, package_info,
+  /// shared_preferences). Channel calls from isolates were observed to hang
+  /// around pause transitions — stillborn init generations and frozen
+  /// prefs write-throughs (2026-07-05/06 wedges) — so the main engine
+  /// resolves everything up front and hands it over at spawn.
+  Map<String, dynamic> buildIsolateHandoff() {
+    // ignore: deprecated_member_use_from_same_package
+    final prefs = GetIt.I<SharedPreferencesService>().i;
+    final prefsSnapshot = <String, Object>{};
+    for (final key in prefs.keys) {
+      final value = prefs.get(key);
+      if (value != null) prefsSnapshot[key] = value;
+    }
+    return {
+      'filesystem': GetIt.I<FilesystemService>().buildHandoff(),
+      'prefs': prefsSnapshot,
+    };
   }
 
   /// Surfaces a "restart the app" notification when the watchdog detects a
@@ -625,11 +675,12 @@ class GlobalIsolate {
   /// Accepts a custom initialization function to allow specialized isolates to load different services
   static Future<void> sharedIsolateEntryPoint(
     List<dynamic> args,
-    Future<void> Function(RootIsolateToken?) initServices,
+    Future<void> Function(RootIsolateToken?, Map<String, dynamic>?, void Function(String)?) initServices,
     Map<IsolateRequestType, IsolateAction> defaultActionMap,
   ) async {
     final SendPort sendPort = args[0];
     final RootIsolateToken? rootIsolateToken = args.length > 1 ? args[1] : null;
+    final Map<String, dynamic>? handoff = args.length > 2 ? (args[2] as Map?)?.cast<String, dynamic>() : null;
     // Use the action map supplied directly by the entry point (defaultActionMap).
     // This intentionally ignores args[2] — the action map is never passed across the
     // isolate boundary because serialising generic Map<K, typedef> values is fragile
@@ -648,12 +699,28 @@ class GlobalIsolate {
     final receivePort = ReceivePort();
     sendPort.send(receivePort.sendPort);
 
-    await initServices(rootIsolateToken);
+    // Init progress reports are logged by the MANAGER (main engine), which is
+    // flush-safe — a generation that stalls during init names its stage even
+    // though its own log buffer never gets written.
+    void reportStage(String stage) {
+      try {
+        sendPort.send({'__init_stage__': stage});
+      } catch (_) {}
+    }
+
+    await initServices(rootIsolateToken, handoff, reportStage);
+    reportStage('done');
 
     receivePort.listen((message) async {
       // Cooperative shutdown (sent by the manager instead of Isolate.kill so a
       // natively-blocked isolate finishes its in-flight call before exiting).
       if (message is Map && message['__shutdown__'] == true) {
+        // Flush buffered log writes first — Isolate.exit() discards anything
+        // still queued in the logger (this is how the wedged generations
+        // vanished from the 2026-07-06 log file).
+        try {
+          await GetIt.I<BaseLogger>().dispose().timeout(const Duration(seconds: 2));
+        } catch (_) {}
         receivePort.close();
         Isolate.exit();
       }
@@ -804,8 +871,10 @@ class _RequestInfo<T> {
   final Completer<T> completer;
   final Timer? timer;
   final IsolateRequestType type;
+  final DateTime issuedAt;
 
-  _RequestInfo({required this.completer, this.timer, required this.type});
+  _RequestInfo({required this.completer, this.timer, required this.type, DateTime? issuedAt})
+      : issuedAt = issuedAt ?? DateTime.now();
 }
 
 /// A standard request format for isolate communication
