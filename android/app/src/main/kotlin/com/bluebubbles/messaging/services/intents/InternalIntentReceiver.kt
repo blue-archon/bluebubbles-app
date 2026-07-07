@@ -169,7 +169,20 @@ class InternalIntentReceiver: BroadcastReceiver() {
                     },
                     onError = { error ->
                         Log.e(Constants.logTag, "Failed to send reaction: $error")
-                        
+
+                        // Surface the actual failure reason to the user (diagnostic):
+                        // the notification-action tapback runs natively, so its error
+                        // is otherwise only visible in logcat. A toast makes the cause
+                        // (bad server URL/auth, HTTP error, Private API issue) readable
+                        // on-device without an adb capture.
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Tapback failed: $error",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
+
                         // Show error state, then revert after a delay
                         updateReactionButton(
                             context, 
