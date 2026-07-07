@@ -6,6 +6,7 @@ import 'dart:ui' show AppLifecycleState;
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:bluebubbles/env.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
+import 'package:bluebubbles/helpers/backend/settings_helpers.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/services/isolates/global_isolate.dart';
 import 'package:bluebubbles/services/isolates/incremental_sync_isolate.dart';
@@ -167,6 +168,12 @@ class StartupTasks {
   static Future<void> initStartupServices({bool isBubble = false}) async {
     debugPrint("Initializing startup services...");
     await _initCoreServices(headless: false);
+
+    // Backfill the legacy FlutterSharedPreferences store that native services
+    // read (notification tapback, foreground socket) — the app persists
+    // settings to DataStore, which native code can't read. Android-only,
+    // fire-and-forget so it never blocks startup.
+    unawaited(mirrorNativeSettingsToLegacyPrefs());
 
     final startupInteropReady = _preRegisterInteropServices(
       headless: false,
