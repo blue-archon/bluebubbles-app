@@ -45,12 +45,30 @@ class _ImageViewerState extends State<ImageViewer> with AutomaticKeepAliveClient
   // is left for a manual retry (no auto-loop).
   bool _autoHealedDecode = false;
 
+  // Re-downloads the attachment and, on completion, evicts Flutter's cached
+  // (failed) decode for its path so the fresh bytes are re-read in place.
+  // Without the eviction the stale cache entry keeps rendering the error until
+  // the chat is re-entered. Setting the guard first prevents the auto-heal path
+  // from re-firing while the re-download (which flips isDownloaded false) runs.
+  void _healAttachment() {
+    if (attachment.guid?.isEmpty ?? true) return;
+    _autoHealedDecode = true;
+    AttachmentsSvc.redownloadAttachment(
+      attachment,
+      onComplete: (_) async {
+        if (!mounted) return;
+        try {
+          await FileImage(File(attachment.path)).evict();
+          await FileImage(File(attachment.convertedPath)).evict();
+        } catch (_) {}
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
   Widget _buildImageDecodeError(BuildContext context, {StackTrace? stacktrace}) {
     if (!_autoHealedDecode && attachment.isDownloaded != true && (attachment.guid?.isNotEmpty ?? false)) {
-      _autoHealedDecode = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        AttachmentsSvc.redownloadAttachment(attachment);
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _healAttachment());
     }
     return Center(
       heightFactor: 1,
@@ -66,10 +84,7 @@ class _ImageViewerState extends State<ImageViewer> with AutomaticKeepAliveClient
             IconButton(
               tooltip: "Retry download",
               icon: Icon(CupertinoIcons.arrow_clockwise, color: context.theme.colorScheme.primary),
-              onPressed: () {
-                _autoHealedDecode = false;
-                AttachmentsSvc.redownloadAttachment(attachment);
-              },
+              onPressed: _healAttachment,
             ),
           ],
         ),
