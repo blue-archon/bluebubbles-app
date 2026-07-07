@@ -16,6 +16,12 @@ import 'package:flutter/material.dart';
 mixin MessagesServiceMixin<T extends StatefulWidget> on State<T> {
   MessagesService? _messageService;
 
+  /// The service's ownershipEpoch at the moment this view adopted it. If the
+  /// service's epoch has advanced by dispose time, another view (same-chat
+  /// re-entry via share/notification intent) owns it now and we must not
+  /// close it.
+  int? _adoptedEpoch;
+
   /// Get the messages service instance
   MessagesService get messageService {
     assert(_messageService != null, 'MessagesService not initialized. Call initialize method first.');
@@ -50,6 +56,10 @@ mixin MessagesServiceMixin<T extends StatefulWidget> on State<T> {
   }) {
     // Use custom service or get/create singleton
     _messageService = customService != null ? registerMessagesSvc(customService) : ensureMessagesSvc(chat.guid);
+
+    // Take ownership: mark this view as the service's latest adopter.
+    _messageService!.ownershipEpoch++;
+    _adoptedEpoch = _messageService!.ownershipEpoch;
 
     // Only initialize handlers if this is NOT a customService
     // CustomService is already initialized by the caller, don't reinitialize
@@ -175,10 +185,17 @@ mixin MessagesServiceMixin<T extends StatefulWidget> on State<T> {
   /// ChatCreator to ConversationView) so the service stays alive in GetX's
   /// registry and [prepMessage] can still reach it via [addNewMessage].
   void disposeMessagesService({bool force = false, bool onlyDetach = false}) {
-    if (!onlyDetach) {
+    // If another view adopted this service after us (same-chat re-entry via a
+    // share-sheet or notification intent — the new route initializes before
+    // the Navigator disposes the old one), closing it here would gut the
+    // struct and MessageStates the newer view is actively rendering from.
+    final adoptedByNewerView =
+        _messageService != null && _adoptedEpoch != null && _messageService!.ownershipEpoch != _adoptedEpoch;
+    if (!onlyDetach && !adoptedByNewerView) {
       _messageService?.close(force: force);
     }
 
     _messageService = null;
+    _adoptedEpoch = null;
   }
 }
