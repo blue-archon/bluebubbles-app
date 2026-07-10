@@ -17,11 +17,23 @@ dynamic deepNormalizeJson(dynamic raw) {
       return jsonDecode(jsonEncode(raw));
     } catch (_) {
       if (raw is Map) {
-        return Map<String, dynamic>.fromEntries(
-          raw.entries.map(
-            (e) => MapEntry(e.key.toString(), deepNormalizeJson(e.value)),
-          ),
-        );
+        // Rebuild key-by-key. `raw` may be a CastMap<String, Object> (produced by
+        // `.cast<String, Object>()` on a JSON-decoded socket/method-channel payload):
+        // iterating its entries — or the jsonEncode above — casts each value to the
+        // non-nullable Object, which throws on a genuinely-null field before we ever
+        // reach the recursive normalize. Read each value through a guarded lookup so
+        // a single null can't abort the whole parse (dropping the chat/attachment).
+        final result = <String, dynamic>{};
+        for (final key in raw.keys) {
+          dynamic value;
+          try {
+            value = raw[key];
+          } catch (_) {
+            value = null;
+          }
+          result[key.toString()] = deepNormalizeJson(value);
+        }
+        return result;
       }
       if (raw is List) {
         return raw.map(deepNormalizeJson).toList();
