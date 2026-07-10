@@ -6,6 +6,19 @@
 
 ---
 
+## Release History
+
+- **v2.0.0.85-dnd.2** (2026-07-10) — a heavy-use reliability pass surfaced while soaking dnd.1 on desktop and Android:
+  - **Background isolate no longer wedges around app pause/resume.** Platform-channel calls were eliminated from background isolates (they could hang around the pause that arms the isolate drain), plus a DB write-lock and a drain watchdog. Fixes intermittent stalls and stuck sends under active use.
+  - **Open conversation no longer gets gutted by a same-chat re-entry.** A `MessagesService` ownership race could blank the thread or fill it with error tiles when the same chat was opened again quickly; ownership is now epoch-guarded.
+  - **A crash-poisoned image now self-heals.** A truncated file from a mid-download crash used to show "Failed to display image" forever; a decode failure now triggers a one-time re-download.
+  - **Native tapbacks work again on Android.** Notification reactions (Like, etc.) failed with "No server URL configured" because native code read the legacy prefs store the Dart app no longer wrote; the ten native-read keys are now mirrored back to it.
+  - **A message from an unknown number appears immediately with its correct preview** — no missing tile, and no blank subtitle line that only filled in after opening the chat.
+  - **Hardened socket / method-channel payload parsing** so a single null field can no longer abort a `Chat`/`Attachment` parse and drop the event.
+- **v2.0.0.85-dnd.1** (2026-07-04) — hardened baseline: the messaging-reliability and desktop-hardening tracks documented below (upstream PRs #3068–#3072, #3074, #3075).
+
+---
+
 ## What This Fork Adds
 
 ### Feature 1: Per-Contact Do Not Disturb Bypass via Android Starred Contacts
