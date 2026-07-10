@@ -4,6 +4,7 @@ import 'dart:ui' hide window;
 
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/helpers/backend/startup_tasks.dart';
+import 'package:bluebubbles/utils/startup_diag.dart'; // [startup-diag]
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
@@ -61,6 +62,13 @@ class LifecycleService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (headless) return;
     Logger.debug("App State changed to $state");
+    // [startup-diag] durable phase marker so a native kill during a resume
+    // (observation #2) is visible on the next launch.
+    if (state == AppLifecycleState.resumed) {
+      StartupDiag.recordPhase('resumed');
+    } else if (state == AppLifecycleState.paused) {
+      StartupDiag.recordPhase('paused');
+    }
 
     // If the current state is resume, and we've already had a resume, clear states from before the last resume
     if (state == AppLifecycleState.resumed && statesSinceLastResume.contains(AppLifecycleState.resumed)) {

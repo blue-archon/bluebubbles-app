@@ -11,6 +11,7 @@ import 'package:bluebubbles/helpers/backend/startup_tasks.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/network/http_overrides.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
+import 'package:bluebubbles/utils/startup_diag.dart'; // [startup-diag]
 import 'package:bluebubbles/utils/window_effects.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/startup/failure_to_start.dart';
@@ -63,7 +64,17 @@ Future<Null> bubble() async {
 Future<Null> initApp(bool bubble, List<String> arguments) async {
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // [startup-diag] temporary white-screen / native-kill instrumentation.
+    StartupDiag.crumb('binding-ready');
+    StartupDiag.armFirstFrameWatchdog();
+    PlatformDispatcher.instance.onError = (error, stack) {
+      StartupDiag.reportUncaught('PlatformDispatcher', error, stack);
+      return true;
+    };
+
     await StartupTasks.initStartupServices(isBubble: bubble);
+    StartupDiag.checkPreviousSession(); // [startup-diag]
 
     /* ----- RANDOM STUFF INITIALIZATION ----- */
     HttpOverrides.global = CustomHttpContext();
@@ -78,6 +89,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       // Once all the services are initialized, we need to perform some
       // startup tasks to ensure that the app has the information it needs.
       StartupTasks.onStartup().then((_) {
+        StartupDiag.crumb('onStartup-complete'); // [startup-diag]
         Logger.info("Startup tasks completed");
       }).catchError((e, s) {
         Logger.error("Failed to complete startup tasks!", error: e, trace: s);
@@ -194,6 +206,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       light = pair.light;
       dark = pair.dark;
 
+      StartupDiag.crumb('runApp:main'); // [startup-diag]
       runApp(MaterialApp(
           home: Main(
         lightTheme: light,
@@ -206,6 +219,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
   }, (dynamic error, StackTrace stackTrace) {
     print("Failure during app initialization: $error");
     print(stackTrace);
+    StartupDiag.dump('zone.onError'); // [startup-diag]
     Logger.error("Unhandled Exception", trace: stackTrace, error: error);
   });
 }
@@ -467,6 +481,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver, TrayListener {
 
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       StartupTasks.uiReady.complete();
+      StartupDiag.markFirstFrame(); // [startup-diag]
 
       if (!LifecycleSvc.isBubble && !kIsWeb && !kIsDesktop) {
         LifecycleSvc.createFakePort();
