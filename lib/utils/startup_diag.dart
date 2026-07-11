@@ -100,9 +100,30 @@ class StartupDiag {
           Logger.info('[$_tag] previous session last phase: $last', tag: _tag);
         } else {
           Logger.error('[$_tag] previous session ended UNCLEANLY — last phase: $last');
+          _reportPreviousExitReason();
         }
       }
       recordPhase('starting');
+    } catch (_) {}
+  }
+
+  /// Ask Android *why* the previous process died (ApplicationExitInfo, API 30+):
+  /// native crash vs ANR vs OOM vs user-swipe. A native/native-kill death runs no
+  /// Dart code, so this is the only in-app signal for the cause. Best-effort/async;
+  /// never blocks or throws. Android-only (invokeMethod no-ops on desktop/web).
+  static void _reportPreviousExitReason() {
+    try {
+      if (!GetIt.I.isRegistered<MethodChannelService>()) return;
+      unawaited(() async {
+        try {
+          final info = await MethodChannelSvc.invokeMethod('get-last-exit-reason');
+          if (info != null) {
+            Logger.error('[$_tag] previous process exit reason: $info');
+          }
+        } catch (e) {
+          Logger.warn('[$_tag] could not read exit reason: $e', tag: _tag);
+        }
+      }());
     } catch (_) {}
   }
 }

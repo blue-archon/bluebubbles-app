@@ -18,6 +18,7 @@ import com.bluebubbles.messaging.services.notifications.StartNotificationListene
 import com.bluebubbles.messaging.services.notifications.UnifiedPushHandler
 import com.bluebubbles.messaging.services.system.BrowserLaunchRequestHandler
 import com.bluebubbles.messaging.services.system.CheckChromeOsHandler
+import com.bluebubbles.messaging.services.system.LastExitReasonHandler
 import com.bluebubbles.messaging.services.system.NewContactFormRequestHandler
 import com.bluebubbles.messaging.services.system.OpenCalendarRequestHandler
 import com.bluebubbles.messaging.services.system.OpenConversationNotificationSettingsHandler
@@ -120,6 +121,7 @@ class MethodCallHandler {
             StartNotificationListenerHandler.tag -> StartNotificationListenerHandler().handleMethodCall(call, result, context)
             OpenConversationNotificationSettingsHandler.tag -> OpenConversationNotificationSettingsHandler().handleMethodCall(call, result, context)
             GetContentUriPathHandler.tag -> GetContentUriPathHandler().handleMethodCall(call, result, context)
+            LastExitReasonHandler.tag -> LastExitReasonHandler().handleMethodCall(call, result, context) // [startup-diag]
             CreateIncomingMessageNotification.tag -> CreateIncomingMessageNotification().handleMethodCall(call, result, context)
             CreateIncomingFaceTimeNotification.tag -> CreateIncomingFaceTimeNotification().handleMethodCall(call, result, context)
             DeleteNotificationHandler.tag -> DeleteNotificationHandler().handleMethodCall(call, result, context)
