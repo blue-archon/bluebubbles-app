@@ -382,7 +382,10 @@ class Chat {
 
     // Handle post-save operations on main thread
     if (isNewer) {
-      setLatestMessage(message);
+      // Link the *saved* (DB-hydrated) message, not the raw input, so a
+      // freshly-added chat's tile is built with its subtitle already populated
+      // when this runs before addChat/ChatState construction.
+      setLatestMessage(newMessage ?? message);
       if (dateDeleted != null) {
         dateDeleted = null;
         await saveAsync(updateDateDeleted: true);

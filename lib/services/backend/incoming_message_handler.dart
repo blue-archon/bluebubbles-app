@@ -381,15 +381,9 @@ class IncomingMessageHandler {
         unawaited(ChatsSvc.setChatHasUnread(c, false, force: true));
       }
 
-      // Link the latest message onto the chat *before* it reaches ChatState, so a
-      // freshly-added chat's tile is constructed with its subtitle already populated.
-      // Otherwise addChat() builds the ChatState (seeding subtitle from
-      // dbLatestMessage.target, still null here) and renders the tile before
-      // updateChatLatestMessage() runs — leaving an empty preview line until the chat
-      // is opened. Covers text and attachments alike (getNotificationText falls back
-      // to "Attachment" when the relation hasn't loaded yet).
-      c.setLatestMessage(saved);
-
+      // The latest-message link is set on the guarded DB-sync path (Chat.addMessage,
+      // gated on isNewer) using the saved message, so a freshly-added chat's tile is
+      // already built with its subtitle populated by the time addChat runs here.
       if (!ChatsSvc.updateChat(c, override: true)) {
         await ChatsSvc.addChat(c, immediate: true);
       }
