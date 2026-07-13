@@ -372,12 +372,30 @@ class ChatActions {
             needsUpdate = true;
           }
 
-          // Keep chat participant list in sync when we resolve a new sender
-          if (handleToLink != null &&
-              dbChat != null &&
-              !dbChat.handles.any((h) => h.originalROWID == handleToLink!.originalROWID)) {
-            dbChat.handles.add(handleToLink);
-            dbChat.handles.applyToDb();
+          // Keep the chat's participant list in sync with the resolved sender and
+          // collapse any duplicate entries. De-dupe on the handle's real identity
+          // (address + service, its unique key) as well as originalROWID: a
+          // message's sender handle can carry a null/mismatched originalROWID
+          // versus the copy already linked to the chat, and an originalROWID-only
+          // guard both re-adds the same number and never removes a pre-existing
+          // duplicate (ToMany is a list, so the same handle can appear twice).
+          if (handleToLink != null && dbChat != null) {
+            bool sameIdentity(Handle a, Handle b) =>
+                (a.originalROWID != null && a.originalROWID == b.originalROWID) ||
+                (a.address == b.address && a.service == b.service);
+            final current = List<Handle>.from(dbChat.handles);
+            final deduped = <Handle>[];
+            for (final h in current) {
+              if (!deduped.any((d) => sameIdentity(d, h))) deduped.add(h);
+            }
+            final hadDuplicate = deduped.length != current.length;
+            final senderMissing = !deduped.any((d) => sameIdentity(d, handleToLink!));
+            if (senderMissing) deduped.add(handleToLink);
+            if (hadDuplicate || senderMissing) {
+              dbChat.handles.clear();
+              dbChat.handles.addAll(deduped);
+              dbChat.handles.applyToDb();
+            }
           }
 
           // Process and link attachments if present
