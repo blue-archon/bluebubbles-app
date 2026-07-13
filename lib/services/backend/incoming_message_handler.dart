@@ -547,9 +547,16 @@ class IncomingMessageHandler {
       final chatForCheck = local ?? partial;
       final incomingFromOther = !(m.isFromMe ?? false);
 
-      // Always refresh participants for incoming group messages — push payloads
-      // carry handleId only, and a stale local participant list breaks linking.
+      // For incoming group messages, only re-fetch participants when the sender's
+      // handle isn't already resolvable locally. Push payloads carry handleId only,
+      // so a missing sender is what breaks linking; when we already have it, skip
+      // the server round-trip (re-fetching on every group message doesn't scale).
       if (incomingFromOther && _chatIsGroup(chatForCheck)) {
+        final senderResolvable =
+            m.handleId != null && (local?.handles.any((h) => h.originalROWID == m.handleId) ?? false);
+        if (senderResolvable) {
+          return (chat: local!, affectedHandleIds: <int>[]);
+        }
         Logger.debug(
           'Refetching group participants for ${partial.guid} (handleId=${m.handleId})',
           tag: _tag,

@@ -270,12 +270,17 @@ class ChatActions {
           // the message is linked to the contact-aware handle instead of creating
           // an orphaned duplicate.
           final addr = inputMessage.handle!.address;
-          final altAddr = addr.startsWith('+') ? addr.substring(1) : '+$addr';
-          final altUAS = '$altAddr/${inputMessage.handle!.service}';
-          final altQuery = handleBox.query(Handle_.uniqueAddressAndService.equals(altUAS)).build();
-          altQuery.limit = 1;
-          final altHandle = altQuery.findFirst();
-          altQuery.close();
+          // Only phone numbers have a +/− prefix variant. Skip emails — an '@'
+          // address would otherwise produce a nonsensical "+user@example.com" query.
+          Handle? altHandle;
+          if (!addr.contains('@')) {
+            final altAddr = addr.startsWith('+') ? addr.substring(1) : '+$addr';
+            final altUAS = '$altAddr/${inputMessage.handle!.service}';
+            final altQuery = handleBox.query(Handle_.uniqueAddressAndService.equals(altUAS)).build();
+            altQuery.limit = 1;
+            altHandle = altQuery.findFirst();
+            altQuery.close();
+          }
 
           if (altHandle != null) {
             handleToLink = altHandle;

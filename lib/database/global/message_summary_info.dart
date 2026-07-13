@@ -27,7 +27,7 @@ class MessageSummaryInfo {
                   )
                 }
               : Map<String, List<EditedContent>>.from(
-                  asStringDynamicMapRequired(json["editedContent"])!.map(
+                  asStringDynamicMapRequired(json["editedContent"]).map(
                     (k, v) => MapEntry(
                       k,
                       List<EditedContent>.from(
@@ -41,7 +41,7 @@ class MessageSummaryInfo {
           : json["originalTextRange"] is List
               ? {"0": List<int>.from(json["originalTextRange"])}
               : Map<String, List<int>>.from(
-                  asStringDynamicMapRequired(json["originalTextRange"])!.map(
+                  asStringDynamicMapRequired(json["originalTextRange"]).map(
                     (k, v) => MapEntry(k.toString(), List<int>.from(v as List)),
                   ),
                 ),
