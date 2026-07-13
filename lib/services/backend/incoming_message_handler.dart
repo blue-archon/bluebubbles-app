@@ -384,7 +384,13 @@ class IncomingMessageHandler {
       // The latest-message link is set on the guarded DB-sync path (Chat.addMessage,
       // gated on isNewer) using the saved message, so a freshly-added chat's tile is
       // already built with its subtitle populated by the time addChat runs here.
-      if (!ChatsSvc.updateChat(c, override: true)) {
+      //
+      // Gate add-vs-update on the chat actually existing, not on updateChat's return:
+      // updateChat also returns false when headless or when the chat's state isn't
+      // loaded, which would otherwise call addChat for a chat that already exists.
+      if (ChatsSvc.findChatByGuid(c.guid) != null) {
+        ChatsSvc.updateChat(c, override: true);
+      } else {
         await ChatsSvc.addChat(c, immediate: true);
       }
       ChatsSvc.updateChatLatestMessage(c.guid, saved);
