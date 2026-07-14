@@ -213,8 +213,16 @@ class IntentsService {
 
       await StartupTasks.waitForUI();
 
-      bool chatIsOpen = ChatsSvc.activeChat?.chat.guid == guid;
-      Logger.debug("Chat is active: $chatIsOpen", tag: "IntentsService");
+      // Treat the chat as already open if it's the active chat OR a view for it
+      // is still mounted. activeChat alone is unreliable here: it's nulled by
+      // setAllInactive (e.g. the share flow) while the view is still on the
+      // stack, so keying off it lets a duplicate ConversationView get pushed —
+      // the new view adopts the shared MessagesService, then the old route's
+      // dispose closes it out from under the new one ("Error loading message").
+      final activeMatch = ChatsSvc.activeChat?.chat.guid == guid;
+      final mountedMatch = ChatsSvc.isConversationMounted(guid);
+      bool chatIsOpen = activeMatch || mountedMatch;
+      Logger.debug("openChat dedupe: activeMatch=$activeMatch mountedMatch=$mountedMatch", tag: "IntentsService");
 
       setPickedAttachments() {
         if (attachments.isNotEmpty) {

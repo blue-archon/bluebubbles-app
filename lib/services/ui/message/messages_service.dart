@@ -61,16 +61,6 @@ class MessagesService extends GetxController {
   final String tag;
   MessagesService(this.tag);
 
-  /// Incremented each time a view adopts this service via
-  /// MessagesServiceMixin.initializeMessagesService. A disposing view only
-  /// closes the service if it is still the latest adopter: re-opening the
-  /// same chat via an intent (share sheet / notification tap) pushes a new
-  /// view that adopts the existing service BEFORE the Navigator tears down
-  /// the old route, and without this guard the old view's dispose guts the
-  /// service out from under the new one — every visible row then renders
-  /// "Error loading message at index N" until the chat is re-entered.
-  int ownershipEpoch = 0;
-
   bool _init = false;
   bool messagesLoaded = false;
   String? method;
