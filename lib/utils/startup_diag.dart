@@ -117,10 +117,11 @@ class StartupDiag {
       if (!GetIt.I.isRegistered<MethodChannelService>()) return;
       unawaited(() async {
         try {
+          // Log unconditionally. A null reply used to log nothing at all, so a
+          // probe that silently found nothing looked identical to one that never
+          // ran — the failure mode that cost us the 2026-07-15 crash cause.
           final info = await MethodChannelSvc.invokeMethod('get-last-exit-reason');
-          if (info != null) {
-            Logger.error('[$_tag] previous process exit reason: $info');
-          }
+          Logger.error('[$_tag] previous process exit reason: ${info ?? 'PROBE RETURNED NULL'}');
         } catch (e) {
           Logger.warn('[$_tag] could not read exit reason: $e', tag: _tag);
         }
