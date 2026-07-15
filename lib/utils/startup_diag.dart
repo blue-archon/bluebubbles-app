@@ -25,9 +25,10 @@ class StartupDiag {
 
   static void crumb(String stage) {
     try {
+      // Ring buffer only — routine crumbs are silent. The trail is flushed at
+      // ERROR by [dump] on an actual failure (white screen / uncaught error).
       _crumbs.add('${DateTime.now().toUtc().toIso8601String()} $stage');
       if (_crumbs.length > 60) _crumbs.removeAt(0);
-      Logger.info('[crumb] $stage', tag: _tag);
     } catch (_) {}
   }
 
@@ -96,9 +97,9 @@ class StartupDiag {
       final last = PrefsSvc.i.getString(_phaseKey);
       if (last != null) {
         final normalBackground = last.contains('paused') || last.contains('clean');
-        if (normalBackground) {
-          Logger.info('[$_tag] previous session last phase: $last', tag: _tag);
-        } else {
+        // Stay silent on a normal (paused/clean) previous session; only speak up
+        // when the previous session died mid-work — observation #2 forensics.
+        if (!normalBackground) {
           Logger.error('[$_tag] previous session ended UNCLEANLY — last phase: $last');
           _reportPreviousExitReason();
         }
