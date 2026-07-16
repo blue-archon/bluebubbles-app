@@ -4,6 +4,8 @@ import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.bluebubbles.messaging.Constants
 import com.bluebubbles.messaging.models.MethodCallHandlerImpl
@@ -36,12 +38,23 @@ class LastExitReasonHandler : MethodCallHandlerImpl() {
             result.success(mapOf("probe" to "unavailable: SDK ${Build.VERSION.SDK_INT} < 30"))
             return
         }
-        try {
+        // Platform-channel calls arrive on the main thread, but this probe hits binder
+        // and, for native crashes / ANRs, reads tombstone files off disk — during app
+        // startup, no less. Doing that inline would risk stalling the very main thread
+        // whose stalls we are trying to diagnose. Collect off-thread, reply on the main
+        // looper (MethodChannel.Result must be answered there).
+        val appContext = context.applicationContext
+        val mainHandler = Handler(Looper.getMainLooper())
+        Thread({
+            val reply = collect(appContext)
+            mainHandler.post { result.success(reply) }
+        }, "last-exit-reason-probe").start()
+    }
+
+    private fun collect(context: Context): Map<String, Any?> {
+        return try {
             val am = context.getSystemService(ActivityManager::class.java)
-            if (am == null) {
-                result.success(mapOf("probe" to "unavailable: no ActivityManager on this context"))
-                return
-            }
+                ?: return mapOf("probe" to "unavailable: no ActivityManager on this context")
             // Pull several records, not just the newest: the record for the death we
             // are asking about may not be written yet when we probe seconds later, and
             // the surrounding history tells us whether the process is dying at all (an
@@ -49,18 +62,15 @@ class LastExitReasonHandler : MethodCallHandlerImpl() {
             // an engine/Activity restart rather than a process kill).
             val infos = am.getHistoricalProcessExitReasons(context.packageName, 0, MAX_RECORDS)
             if (infos.isNullOrEmpty()) {
-                result.success(mapOf("probe" to "ran, but no exit records exist for ${context.packageName}"))
-                return
+                return mapOf("probe" to "ran, but no exit records exist for ${context.packageName}")
             }
-            result.success(
-                mapOf(
-                    "probe" to "ok (${infos.size} record(s), sdk ${Build.VERSION.SDK_INT})",
-                    "records" to infos.map { describe(it) },
-                )
+            mapOf(
+                "probe" to "ok (${infos.size} record(s), sdk ${Build.VERSION.SDK_INT})",
+                "records" to infos.map { describe(it) },
             )
         } catch (e: Exception) {
             Log.e(Constants.logTag, "Failed to read last exit reason", e)
-            result.success(mapOf("probe" to "failed: ${e.javaClass.simpleName}: ${e.message}"))
+            mapOf("probe" to "failed: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
