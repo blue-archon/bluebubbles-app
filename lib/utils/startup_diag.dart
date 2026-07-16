@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 
 /// TEMPORARY startup / white-screen / native-kill diagnostic.
@@ -114,6 +116,11 @@ class StartupDiag {
   /// never blocks or throws. Android-only (invokeMethod no-ops on desktop/web).
   static void _reportPreviousExitReason() {
     try {
+      // Android-only. ApplicationExitInfo has no desktop equivalent, and
+      // invokeMethod returns null on desktop/web without ever reaching Kotlin —
+      // which the unconditional log below would misreport as a failed probe on
+      // every unclean desktop exit.
+      if (kIsWeb || kIsDesktop) return;
       if (!GetIt.I.isRegistered<MethodChannelService>()) return;
       unawaited(() async {
         try {
