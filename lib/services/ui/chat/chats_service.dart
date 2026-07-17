@@ -1277,9 +1277,38 @@ class ChatsService {
   /// Update chat latest message and subtitle in response to a new or updated message.
   /// Called by IncomingMessageHandler and SyncService to keep ChatState as the single
   /// source of truth for the conversation tile subtitle.
-  void updateChatLatestMessage(String chatGuid, Message message) {
+  ///
+  /// The latest-message pointer only ever moves forward in time. Incremental sync
+  /// reports the newest message *in its delta* as a chat's latest, which can be an
+  /// OLD message (an edit / read-receipt / backfill on a days-old message); applying
+  /// it would rewind the sort key and bury an actively-messaged chat down the list
+  /// (confirmed 2026-07-17: a July-6 message repeatedly demoted a chat that had just
+  /// surfaced on today's messages). [MessagesService] already guarded this at its own
+  /// call site; centralising it here protects every caller. [allowOlder] opts out for
+  /// the one legitimate downgrade — recomputing the latest after the newest message is
+  /// deleted, which must fall back to an older surviving message.
+  void updateChatLatestMessage(String chatGuid, Message message, {bool allowOlder = false}) {
     final state = getChatState(chatGuid);
     if (state == null) return;
+
+    if (!allowOlder) {
+      final current = state.latestMessage.value;
+      final currentDate = current?.dateCreated;
+      final incomingDate = message.dateCreated;
+      if (current != null &&
+          current.guid != message.guid &&
+          currentDate != null &&
+          currentDate.millisecondsSinceEpoch > 0 &&
+          incomingDate != null &&
+          incomingDate.isBefore(currentDate)) {
+        Logger.info(
+          '[chat-vanish-diag] SKIP older latest for $chatGuid: incoming ${message.guid} '
+          '@${incomingDate.toIso8601String()} < current ${current.guid} @${currentDate.toIso8601String()}',
+          tag: 'ChatVanishDiag',
+        );
+        return;
+      }
+    }
 
     state.updateLatestMessageInternal(message);
     final redacted = SettingsSvc.settings.redactedMode.value;
