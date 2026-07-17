@@ -1289,6 +1289,23 @@ class ChatsService {
         message.getNotificationText(hideContactInfo: hideContactInfo, hideMessageContent: hideMessageContent));
     state.chat.setLatestMessage(message);
     _repositionChat(state.chat, immediate: true);
+
+    // [chat-vanish-diag] TEMPORARY — a busy group intermittently drops off the
+    // phone's chat list. Log where the chat lands in the *visible* (filtered)
+    // list right after a new message so the next log names the mechanism:
+    //   idx == -1  → filtered out entirely (archived / unknown-sender / lost group status)
+    //   idx large  → still present but sorted far down (off-screen)
+    // Remove together with the participant-refetch-storm fix once confirmed.
+    try {
+      final visible = getFilteredChats(showArchived: false, showUnknown: false);
+      final idx = visible.indexWhere((c) => c.guid == chatGuid);
+      Logger.info(
+        '[chat-vanish-diag] $chatGuid idx=$idx/${visible.length} '
+        'archived=${state.chat.isArchived} pinned=${state.chat.isPinned} '
+        'isGroup=${state.chat.isGroup} handles=${state.chat.handles.length} style=${state.chat.style}',
+        tag: 'ChatVanishDiag',
+      );
+    } catch (_) {}
   }
 
   /// Set chat text field text

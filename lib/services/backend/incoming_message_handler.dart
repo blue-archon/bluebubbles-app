@@ -143,6 +143,21 @@ class IncomingMessageHandler {
   final LinkedHashSet<String> _processedGuids = LinkedHashSet();
   static const int _processedGuidLimit = 100;
 
+  // ── Participant-refetch cooldown ─────────────────────────────────────────
+
+  /// Last time we re-fetched participants from the server for a given chat GUID.
+  ///
+  /// The group-message hydration path re-fetches participants whenever it can't
+  /// resolve the sender against the locally-linked handles. That resolution keys
+  /// off `Handle.originalROWID`, which participant handles can carry as null or
+  /// mismatched (see commit bc16b762d) — and FCM pushes deliver only a bare
+  /// handleId — so for some busy groups the sender never resolves and every
+  /// inbound message would trigger a full server refetch + participant relink.
+  /// This cooldown caps that to at most once per [_participantRefetchCooldown]
+  /// per chat; genuine membership changes bypass it via the isGroupEvent path.
+  final Map<String, DateTime> _lastParticipantRefetch = {};
+  static const Duration _participantRefetchCooldown = Duration(minutes: 5);
+
   // ── Out-of-order buffering ───────────────────────────────────────────────
 
   /// Keyed by the server-assigned (real) message GUID.
@@ -557,6 +572,20 @@ class IncomingMessageHandler {
         if (senderResolvable) {
           return (chat: local!, affectedHandleIds: <int>[]);
         }
+        // The originalROWID match above is unreliable (null/mismatched handles,
+        // and FCM pushes carry only a handleId), so for some busy groups the
+        // sender never resolves. Rate-limit the fallback refetch so we don't hit
+        // the server + rewrite the participant list on every single message; keep
+        // using the local record within the cooldown window. Group-membership
+        // events skipped this branch entirely (handled above), so a genuine
+        // add/remove still refreshes immediately.
+        final lastRefetch = _lastParticipantRefetch[partial.guid];
+        final withinCooldown =
+            lastRefetch != null && DateTime.now().difference(lastRefetch) < _participantRefetchCooldown;
+        if (withinCooldown && local != null && local.handles.isNotEmpty) {
+          return (chat: local, affectedHandleIds: <int>[]);
+        }
+        _lastParticipantRefetch[partial.guid] = DateTime.now();
         Logger.debug(
           'Refetching group participants for ${partial.guid} (handleId=${m.handleId})',
           tag: _tag,
