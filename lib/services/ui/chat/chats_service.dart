@@ -1295,17 +1295,18 @@ class ChatsService {
       final current = state.latestMessage.value;
       final currentDate = current?.dateCreated;
       final incomingDate = message.dateCreated;
+      // Reject only a *meaningfully* older message. A temp→real GUID swap can hand
+      // us the real message with a dateCreated a hair before the temp's (observed:
+      // ~120µs) — that is the same message, not an older one, so tolerate small
+      // negatives. The rewind we actually guard against (stale sync deltas) is
+      // always minutes-to-days older, far outside this window.
+      const staleTolerance = Duration(seconds: 2);
       if (current != null &&
           current.guid != message.guid &&
           currentDate != null &&
           currentDate.millisecondsSinceEpoch > 0 &&
           incomingDate != null &&
-          incomingDate.isBefore(currentDate)) {
-        Logger.info(
-          '[chat-vanish-diag] SKIP older latest for $chatGuid: incoming ${message.guid} '
-          '@${incomingDate.toIso8601String()} < current ${current.guid} @${currentDate.toIso8601String()}',
-          tag: 'ChatVanishDiag',
-        );
+          incomingDate.isBefore(currentDate.subtract(staleTolerance))) {
         return;
       }
     }
@@ -1318,33 +1319,6 @@ class ChatsService {
         message.getNotificationText(hideContactInfo: hideContactInfo, hideMessageContent: hideMessageContent));
     state.chat.setLatestMessage(message);
     _repositionChat(state.chat, immediate: true);
-
-    // [chat-vanish-diag] TEMPORARY — a busy group sorts to ~idx 15 on the phone
-    // instead of the top, so it reads as "not showing". The earlier diag proved
-    // it is NOT filtered/archived (idx != -1, isGroup=true). This revision logs
-    // the DATE the chat is being sorted by vs the current top chat's date, which
-    // is decisive:
-    //   msgDate ≈/after topDate but idx large → sort key mis-ordered (comparator/
-    //     downgrade bug — an older message rewound the latest-message pointer)
-    //   msgDate << topDate                     → correctly low; the real issue is
-    //     that the chat's newest-known message is stale (delivery), not the list
-    // (idx here is captured mid-sync-batch, so compare DATES, not the raw index.)
-    // Remove once the mechanism is confirmed.
-    try {
-      final visible = getFilteredChats(showArchived: false, showUnknown: false);
-      final idx = visible.indexWhere((c) => c.guid == chatGuid);
-      final topGuid = visible.isNotEmpty ? visible.first.guid : 'none';
-      final topDate = chatStates[topGuid]?.latestMessage.value?.dateCreated;
-      Logger.info(
-        '[chat-vanish-diag] $chatGuid idx=$idx/${visible.length} '
-        'msgGuid=${message.guid} msgDate=${message.dateCreated?.toIso8601String()} '
-        'isFromMe=${message.isFromMe} '
-        'top=$topGuid topDate=${topDate?.toIso8601String()} '
-        'archived=${state.chat.isArchived} pinned=${state.chat.isPinned} '
-        'isGroup=${state.chat.isGroup} handles=${state.chat.handles.length} style=${state.chat.style}',
-        tag: 'ChatVanishDiag',
-      );
-    } catch (_) {}
   }
 
   /// Set chat text field text
