@@ -74,6 +74,7 @@
         tools:replace="android:label"
         android:enableOnBackInvokedCallback="true"
         android:allowBackup="false"
+        android:largeHeap="true"
         android:memtagMode="async"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
