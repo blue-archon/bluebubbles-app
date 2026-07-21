@@ -65,6 +65,7 @@
     <application
         tools:replace="android:label"
         android:allowBackup="false"
+        android:largeHeap="true"
         android:memtagMode="async"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
