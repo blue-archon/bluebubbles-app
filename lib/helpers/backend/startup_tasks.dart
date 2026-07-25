@@ -10,6 +10,7 @@ import 'package:bluebubbles/services/isolates/global_isolate.dart';
 import 'package:bluebubbles/services/isolates/incremental_sync_isolate.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
+import 'package:bluebubbles/utils/exit_reason_probe.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:bluebubbles/services/backend/notifications/desktop_notification.dart';
@@ -242,6 +243,10 @@ class StartupTasks {
 
     Logger.info("Waiting on MethodChannelService...");
     await _waitForInterop(methodChannel: true);
+
+    // [exit-reason-probe] Log why the previous process died (Android ApplicationExitInfo,
+    // API 30+) to catch the resume->open-chat native kill (observation #2) without adb.
+    reportPreviousExitReason();
 
     Logger.info("Registering CloudMessagingService...");
     GetIt.I.registerSingleton<CloudMessagingService>(CloudMessagingService());
