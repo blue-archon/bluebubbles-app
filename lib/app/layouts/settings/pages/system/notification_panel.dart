@@ -64,7 +64,7 @@ class _NotificationPanelState extends State<NotificationPanel> with SingleTicker
                       backgroundColor: tileColor,
                     )),
               if (!kIsWeb && !kIsDesktop) const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
-              if (!kIsWeb)
+              if (!kIsWeb && !kIsDesktop)
                 Obx(() => SettingsSwitch(
                       onChanged: (bool val) async {
                         SettingsSvc.settings.notifyOnChatList.value = val;
@@ -90,7 +90,7 @@ class _NotificationPanelState extends State<NotificationPanel> with SingleTicker
                           : "Click to enable notifications",
                   backgroundColor: tileColor,
                 ),
-              const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
+              if (!kIsWeb && !kIsDesktop) const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
               Obx(() => SettingsSwitch(
                     onChanged: (bool val) async {
                       SettingsSvc.settings.notifyReactions.value = val;
