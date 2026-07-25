@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bluebubbles/utils/logger/logger.dart';
+import 'package:bluebubbles/utils/deep_map_normalize.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/database/models.dart';
@@ -152,13 +153,13 @@ class Chat {
   }
 
   factory Chat.fromMap(Map<String, dynamic> json) {
-    final message = json['lastMessage'] != null ? Message.fromMap(json['lastMessage']!.cast<String, Object>()) : null;
+    final message = json['lastMessage'] != null ? Message.fromMap(asStringDynamicMapRequired(json['lastMessage'])) : null;
     return Chat(
       id: json["ROWID"] ?? json["id"],
       guid: json["guid"],
       chatIdentifier: json["chatIdentifier"],
       participants:
-          (json['participants'] as List? ?? []).map((e) => Handle.fromMap(e!.cast<String, Object>())).toList(),
+          (json['participants'] as List? ?? []).map((e) => Handle.fromMap(asStringDynamicMapRequired(e))).toList(),
       isArchived: json['isArchived'] ?? false,
       muteType: json["muteType"],
       muteArgs: json["muteArgs"],
