@@ -64,7 +64,9 @@ class _NotificationPanelState extends State<NotificationPanel> with SingleTicker
                   backgroundColor: tileColor,
                 ),
               if (!kIsWeb && !kIsDesktop) const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
-              if (!kIsWeb)
+              // On desktop this toggle has no effect: notifications there fire
+              // regardless of the chat list, so only show it on mobile.
+              if (!kIsWeb && !kIsDesktop)
                 SettingsSwitch(
                   onChanged: (bool val) async {
                     SettingsSvc.settings.notifyOnChatList.value = val;
@@ -90,7 +92,8 @@ class _NotificationPanelState extends State<NotificationPanel> with SingleTicker
                           : "Click to enable notifications",
                   backgroundColor: tileColor,
                 ),
-              const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
+              // Matches the chat-list toggle above: no leading divider on desktop where that toggle is hidden.
+              if (!kIsDesktop) const SettingsDivider(padding: EdgeInsets.only(left: 16.0)),
               SettingsSwitch(
                 onChanged: (bool val) async {
                   SettingsSvc.settings.notifyReactions.value = val;

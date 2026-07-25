@@ -286,7 +286,10 @@ class NotificationsService {
     if (chat.shouldMuteNotification(message)) return;
     if (!headless && LifecycleSvc.isAlive) {
       if (ChatsSvc.isChatActive(chat.guid)) return;
-      if (ChatsSvc.activeChat == null &&
+      // Desktop always notifies for inactive chats; this chat-list suppression is mobile-only.
+      // On desktop's narrow single-pane layout the route is "/" but notifications should fire.
+      if (!kIsDesktop &&
+          ChatsSvc.activeChat == null &&
           Get.rawRoute?.settings.name == "/" &&
           !SettingsSvc.settings.notifyOnChatList.value) {
         return;
