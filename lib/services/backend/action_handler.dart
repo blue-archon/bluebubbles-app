@@ -5,6 +5,7 @@ import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
+import 'package:bluebubbles/utils/deep_map_normalize.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart' hide Response;
 
@@ -106,11 +107,11 @@ class ActionHandler extends GetxService {
               IncomingPayload(
                 type: MessageEventType.newMessage,
                 source: MessageSource.socket,
-                chat: Chat.fromMap(payload.data['chats'].first.cast<String, Object>()),
+                chat: Chat.fromMap(asStringDynamicMapRequired(payload.data['chats'].first)),
                 message: message,
                 attachments: ((payload.data['attachments'] as List?) ?? const [])
                     .whereType<Map>()
-                    .map((e) => Attachment.fromMap(e.cast<String, Object>()))
+                    .map((e) => Attachment.fromMap(asStringDynamicMapRequired(e)))
                     .toList(),
                 tempGuid: payload.data['tempGuid'],
               ),
@@ -126,11 +127,11 @@ class ActionHandler extends GetxService {
               IncomingPayload(
                 type: MessageEventType.updatedMessage,
                 source: MessageSource.socket,
-                chat: Chat.fromMap(payload.data['chats'].first.cast<String, Object>()),
+                chat: Chat.fromMap(asStringDynamicMapRequired(payload.data['chats'].first)),
                 message: updatedMessage,
                 attachments: ((payload.data['attachments'] as List?) ?? const [])
                     .whereType<Map>()
-                    .map((e) => Attachment.fromMap(e.cast<String, Object>()))
+                    .map((e) => Attachment.fromMap(asStringDynamicMapRequired(e)))
                     .toList(),
                 tempGuid: payload.data['tempGuid'],
               ),
@@ -142,7 +143,7 @@ class ActionHandler extends GetxService {
       case "participant-added":
       case "participant-left":
         try {
-          MessageHandlerSvc.handleNewOrUpdatedChat(Chat.fromMap(data['chats'].first.cast<String, Object>()));
+          MessageHandlerSvc.handleNewOrUpdatedChat(Chat.fromMap(asStringDynamicMapRequired(data['chats'].first)));
         } catch (e, s) {
           Logger.warn("Failed to handle chat participant change event", error: e, trace: s, tag: 'ActionHandler');
         }
