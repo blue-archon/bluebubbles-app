@@ -9,6 +9,7 @@ import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/file_utils.dart';
 import 'package:path/path.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
+import 'package:bluebubbles/utils/deep_map_normalize.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -899,7 +900,7 @@ class OutgoingMessageHandler {
         final newMessage = Message.fromMap(data['data']);
         final responseAttachments = ((data['data']?['attachments'] as List?) ?? <dynamic>[])
             .whereType<Map>()
-            .map((e) => Attachment.fromMap(e.cast<String, Object>()))
+            .map((e) => Attachment.fromMap(asStringDynamicMapRequired(e)))
             .toList();
         // Swap attachment GUIDs first, then swap the message GUID.
         for (final a in responseAttachments) {
