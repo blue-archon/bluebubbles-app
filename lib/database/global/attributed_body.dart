@@ -1,4 +1,3 @@
-import 'package:bluebubbles/utils/deep_map_normalize.dart';
 
 class AttributedBody {
   AttributedBody({
@@ -13,7 +12,7 @@ class AttributedBody {
         string: json["string"] ?? "",
         runs: json["runs"] == null
             ? []
-            : List<Run>.from(json["runs"].map((x) => Run.fromMap(asStringDynamicMapRequired(x)))),
+            : List<Run>.from(json["runs"].map((x) => Run.fromMap(x.cast<String, dynamic>()))),
       );
 
   Map<String, dynamic> toMap() => {
@@ -36,7 +35,7 @@ class Run {
 
   factory Run.fromMap(Map<String, dynamic> json) => Run(
         range: json["range"] == null ? [] : List<int>.from(json["range"].map((x) => x)),
-        attributes: json["attributes"] == null ? null : Attributes.fromMap(asStringDynamicMapRequired(json["attributes"])),
+        attributes: json["attributes"] == null ? null : Attributes.fromMap(json["attributes"].cast<String, dynamic>()),
       );
 
   Map<String, dynamic> toMap() => {

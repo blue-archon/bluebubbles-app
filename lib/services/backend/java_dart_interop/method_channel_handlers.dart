@@ -7,7 +7,6 @@ import 'package:bluebubbles/helpers/backend/settings_helpers.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
-import 'package:bluebubbles/utils/deep_map_normalize.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -100,11 +99,11 @@ class MethodChannelHandlers {
         await IncomingMsgHandler.handle(IncomingPayload(
           type: MessageEventType.newMessage,
           source: MessageSource.methodChannel,
-          chat: Chat.fromMap(asStringDynamicMapRequired(payload.data['chats'].first)),
+          chat: Chat.fromMap(payload.data['chats'].first.cast<String, dynamic>()),
           message: Message.fromMap(payload.data),
           attachments: ((payload.data['attachments'] as List?) ?? const [])
               .whereType<Map>()
-              .map((e) => Attachment.fromMap(asStringDynamicMapRequired(e)))
+              .map((e) => Attachment.fromMap(e.cast<String, dynamic>()))
               .toList(),
           tempGuid: payload.data['tempGuid'],
         ));
@@ -153,11 +152,11 @@ class MethodChannelHandlers {
         await IncomingMsgHandler.handle(IncomingPayload(
           type: MessageEventType.updatedMessage,
           source: MessageSource.methodChannel,
-          chat: Chat.fromMap(asStringDynamicMapRequired(payload.data['chats'].first)),
+          chat: Chat.fromMap(payload.data['chats'].first.cast<String, dynamic>()),
           message: Message.fromMap(payload.data),
           attachments: ((payload.data['attachments'] as List?) ?? const [])
               .whereType<Map>()
-              .map((e) => Attachment.fromMap(asStringDynamicMapRequired(e)))
+              .map((e) => Attachment.fromMap(e.cast<String, dynamic>()))
               .toList(),
           tempGuid: payload.data['tempGuid'],
         ));
@@ -183,7 +182,7 @@ class MethodChannelHandlers {
       if (!isNullOrEmpty(data)) {
         final payload = ServerPayload.fromJson(data!);
         await MessageHandlerSvc.handleNewOrUpdatedChat(
-            Chat.fromMap(asStringDynamicMapRequired(payload.data['chats'].first)));
+            Chat.fromMap(payload.data['chats'].first.cast<String, dynamic>()));
       }
     } catch (e, s) {
       return Future.error(e, s);
