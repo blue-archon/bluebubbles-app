@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:bluebubbles/utils/logger/logger.dart';
-import 'package:bluebubbles/utils/deep_map_normalize.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/app/state/message_state.dart';
@@ -203,11 +202,11 @@ class Message {
     List<AttributedBody> attributedBody = [];
     if (json["attributedBody"] != null) {
       if (json['attributedBody'] is Map) {
-        json['attributedBody'] = [asStringDynamicMapRequired(json['attributedBody'])];
+        json['attributedBody'] = [json['attributedBody'].cast<String, dynamic>()];
       }
       try {
         attributedBody =
-            (json['attributedBody'] as List).map((a) => AttributedBody.fromMap(asStringDynamicMapRequired(a))).toList();
+            (json['attributedBody'] as List).map((a) => AttributedBody.fromMap(a.cast<String, dynamic>())).toList();
       } catch (e, stack) {
         Logger.error('Failed to parse attributed body!', error: e, trace: stack);
       }
@@ -220,14 +219,14 @@ class Message {
           metadata = jsonDecode(json["metadata"]);
         } catch (_) {}
       } else {
-        metadata = asStringDynamicMapRequired(json["metadata"]);
+        metadata = json["metadata"].cast<String, dynamic>();
       }
     }
 
     List<MessageSummaryInfo> msi = [];
     try {
       msi = (json['messageSummaryInfo'] as List? ?? [])
-          .map((e) => MessageSummaryInfo.fromJson(asStringDynamicMapRequired(e)))
+          .map((e) => MessageSummaryInfo.fromJson(e.cast<String, dynamic>()))
           .toList();
     } catch (e, stack) {
       Logger.error('Failed to parse summary info!', error: e, trace: stack);
@@ -267,7 +266,7 @@ class Message {
           int.tryParse(json["associatedMessageGuid"].toString().replaceAll("p:", "").split("/").first),
       associatedMessageType: json["associatedMessageType"],
       expressiveSendStyleId: json["expressiveSendStyleId"],
-      handle: json['handle'] != null ? Handle.fromMap(asStringDynamicMapRequired(json['handle'])) : null,
+      handle: json['handle'] != null ? Handle.fromMap(json['handle'].cast<String, dynamic>()) : null,
       hasAttachments: (json['attachments'] as List? ?? []).isNotEmpty || json['hasAttachments'] == true,
       hasReactions: json['hasReactions'] == true,
       dateDeleted: parseDate(json["dateDeleted"]),
