@@ -1,3 +1,67 @@
+# BlueBubbles — Community Fork
+
+> **Unofficial community fork** of [BlueBubblesApp/bluebubbles-app](https://github.com/BlueBubblesApp/bluebubbles-app).
+> It is re-synced onto each BlueBubbles **stable release** (currently **v2.0.0+89**) and adds the
+> differentiators below. Not affiliated with or endorsed by the BlueBubbles project.
+>
+> **Prebuilt binaries** (Android APK, Linux desktop package) are on the
+> [Releases page](https://github.com/blue-archon/bluebubbles-app/releases).
+
+## What this fork adds
+
+On top of the latest upstream release, this fork carries three things:
+
+### 1. Per-contact Do Not Disturb bypass for starred contacts  *(flagship feature)*
+The stock app puts the entire notification channel on the DND override list, so *every* message bypasses
+Do Not Disturb. This fork replaces that with Android's native "starred contacts can interrupt" rule:
+only contacts you've **Favorited** in your Android contacts app ring through DND; everyone else respects
+it. Opt-in, off by default, under Settings → Notification Settings → **Override DND for Favorites**.
+See [setup](#do-not-disturb-bypass-setup) below.
+
+### 2. Larger Android heap
+`android:largeHeap="true"` for extra memory headroom on message-heavy devices.
+
+### 3. Reliability fixes ahead of the next release
+The fork carries crash/stability fixes before they reach an upstream stable release. All are offered
+upstream as PRs, so this list shrinks as they merge:
+
+| Fix | Upstream PR |
+|---|---|
+| A null field in a pushed/socket payload no longer drops the message | [#3131](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3131) |
+| UnifiedPush/ntfy delivery hardening (number parsing, large payloads) | [#3132](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3132) |
+| Portrait notification-avatar divide-by-zero | [#3133](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3133) |
+| Group messages no longer hidden when the participant list is stale | [#3062](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3062) |
+| Desktop notifications show in the narrow single-pane layout | [#3071](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3071) |
+
+The DND feature is also up as [#3064](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3064);
+if it lands, the fork reduces to little more than the `largeHeap` tweak.
+
+## Installing
+
+- **Android (APK):** signed with this fork's own key, so it **cannot install over the official app** —
+  uninstall the official app first (messages live on the server and re-sync). Use the `prod`-flavor APK;
+  it uses the same package id (`com.bluebubbles.messaging`).
+- **Linux desktop:** an Arch/pacman package (`.pkg.tar.zst`) is attached to releases (installs to
+  `/opt/bluebubbles`; per-user data stays in `~/.local/share/app.bluebubbles.BlueBubbles/`). Other
+  distros: build from source.
+- **Windows / macOS:** no prebuilt binaries — build from source (standard Flutter build).
+
+## Do Not Disturb bypass setup
+
+1. In the app: Settings → Application Settings → Notification Settings → enable **Override DND for Favorites**.
+2. Android: Settings → Notifications → Do Not Disturb → Allowed during DND → enable **Starred contacts**
+   (label varies by Android version / manufacturer).
+3. Star/favorite the contacts you want to reach you during DND in your contacts app.
+4. Do **not** add BlueBubbles to the DND "Apps" override list — that bypasses DND for everything again.
+
+**How it works:** the global `com.bluebubbles.new_messages` channel no longer calls `setBypassDnd(true)`.
+On each incoming message, if the sender is a starred contact, the notification `Person` is built with
+`setUri(lookupUri)` + `setImportant(true)` so Android's DND system grants the per-contact exception;
+non-starred senders get neither and respect DND normally. In group chats the bypass keys off the
+*sender's* starred status, not the group.
+
+---
+
 # BlueBubbles
 
 BlueBubbles is an open-source, cross-platform ecosystem of apps that brings iMessage to Android, Windows, Linux, and the web. Send messages, media, reactions, and more — all from your non-Apple devices.
