@@ -22,16 +22,16 @@ See [setup](#do-not-disturb-bypass-setup) below.
 `android:largeHeap="true"` for extra memory headroom on message-heavy devices.
 
 ### 3. Reliability fixes ahead of the next release
-The fork carries crash/stability fixes before they reach an upstream stable release. All are offered
-upstream as PRs, so this list shrinks as they merge:
+Fixes that aren't in a shipped release yet. Beyond DND, the theme is "messages are less likely to
+silently vanish." All are offered upstream as PRs, so this list shrinks as they merge:
 
-| Fix | Upstream PR |
+| What you get | Upstream PR |
 |---|---|
-| A null field in a pushed/socket payload no longer drops the message | [#3131](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3131) |
-| UnifiedPush/ntfy delivery hardening (number parsing, large payloads) | [#3132](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3132) |
-| Portrait notification-avatar divide-by-zero | [#3133](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3133) |
-| Group messages no longer hidden when the participant list is stale | [#3062](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3062) |
-| Desktop notifications show in the narrow single-pane layout | [#3071](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3071) |
+| Incoming messages don't silently go missing (a null field in a message could drop it on arrival) | [#3131](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3131) |
+| Reliable push via UnifiedPush/ntfy, attachments included (large pushes could fail to arrive) | [#3132](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3132) |
+| Group chats stop losing messages or hanging on a loading spinner (stale participant list) | [#3062](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3062) |
+| Desktop notifications show in the narrow single-pane window (otherwise you'd get none there) | [#3071](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3071) |
+| No crash building a notification for a portrait contact photo | [#3133](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3133) |
 
 The DND feature is also up as [#3064](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3064);
 if it lands, the fork reduces to little more than the `largeHeap` tweak.
