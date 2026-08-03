@@ -83,6 +83,9 @@ class _FirebasePanelState extends State<FirebasePanel> with ThemeHelpers {
                       (SocketSvc.socket?.connected ?? false);
                   final fcmRegistered =
                       SettingsSvc.settings.firstFcmRegisterDate.value != 0 && !SettingsSvc.fcmData.isNull;
+                  // On mobile, hide the (re-)register actions when FCM is turned off — they call
+                  // registerDevice(), which early-returns, and would report a misleading success.
+                  final fcmEnabled = kIsDesktop || kIsWeb || SettingsSvc.settings.enableFcm.value;
 
                   return SettingsSection(
                   backgroundColor: tileColor,
@@ -121,8 +124,8 @@ class _FirebasePanelState extends State<FirebasePanel> with ThemeHelpers {
                           materialIcon: Icons.settings,
                           containerColor: statusOk ? Colors.green : Colors.redAccent,
                         )),
-                    if (!socketReady) const SettingsDivider(),
-                    if (!socketReady)
+                    if (fcmEnabled && !socketReady) const SettingsDivider(),
+                    if (fcmEnabled && !socketReady)
                       SettingsTile(
                         backgroundColor: tileColor,
                         title: "Load Configurations from Server",
@@ -250,8 +253,8 @@ class _FirebasePanelState extends State<FirebasePanel> with ThemeHelpers {
                             NavigationSvc.pushSettings(context, const OauthPanel());
                           },
                           trailing: const NextButton()),
-                    if (!kIsDesktop && !kIsWeb && fcmRegistered) const SettingsDivider(),
-                    if (!kIsDesktop && !kIsWeb && fcmRegistered)
+                    if (fcmEnabled && !kIsDesktop && !kIsWeb && fcmRegistered) const SettingsDivider(),
+                    if (fcmEnabled && !kIsDesktop && !kIsWeb && fcmRegistered)
                       SettingsTile(
                         backgroundColor: tileColor,
                         title: "Re-register Device with Server",
