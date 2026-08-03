@@ -87,6 +87,25 @@ class _FirebasePanelState extends State<FirebasePanel> with ThemeHelpers {
                   return SettingsSection(
                   backgroundColor: tileColor,
                   children: [
+                    if (!kIsDesktop && !kIsWeb)
+                      Obx(() => SettingsSwitch(
+                            onChanged: (bool val) async {
+                              SettingsSvc.settings.enableFcm.value = val;
+                              await SettingsSvc.settings.saveOneAsync('enableFcm');
+                            },
+                            initialVal: SettingsSvc.settings.enableFcm.value,
+                            title: "Use Firebase (FCM)",
+                            subtitle:
+                                "Receive notifications through Google Firebase. Turn off if you use another provider such as UnifiedPush and don't want Firebase.",
+                            isThreeLine: true,
+                            backgroundColor: tileColor,
+                            leading: const SettingsLeadingIcon(
+                              iosIcon: CupertinoIcons.bell_fill,
+                              materialIcon: Icons.notifications_active,
+                              containerColor: Colors.blueAccent,
+                            ),
+                          )),
+                    if (!kIsDesktop && !kIsWeb) const SettingsDivider(),
                     SettingsTile(
                         backgroundColor: tileColor,
                         title: "Firebase Status",
