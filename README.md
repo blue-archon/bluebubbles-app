@@ -1,40 +1,55 @@
-# BlueBubbles — Community Fork
+# BlueBubbles Community Fork
 
 > **Unofficial community fork** of [BlueBubblesApp/bluebubbles-app](https://github.com/BlueBubblesApp/bluebubbles-app).
-> It is re-synced onto each BlueBubbles **stable release** (currently **v2.0.0+89**) and adds the
-> differentiators below. Not affiliated with or endorsed by the BlueBubbles project.
+> It stays current with the latest upstream and adds the features and fixes below. Not affiliated with or
+> endorsed by the BlueBubbles project.
 >
 > **Prebuilt binaries** (Android APK, Linux desktop package) are on the
 > [Releases page](https://github.com/blue-archon/bluebubbles-app/releases).
 
-## What this fork adds
+## What this fork is
 
-On top of the latest upstream release, this fork carries three things:
+A BlueBubbles client that carries a handful of improvements the official app doesn't have yet, and that
+tracks the latest upstream `master`, so you also get BlueBubbles' newest work before it reaches the Play
+Store, Microsoft Store, or Flathub. Everything here that isn't fork-specific is offered upstream as a pull
+request, so the fork shrinks as those land.
 
-### 1. Per-contact Do Not Disturb bypass for starred contacts  *(flagship feature)*
+## Features
+
+### 1. Per-contact Do Not Disturb bypass  *(flagship)*
 The stock app puts the entire notification channel on the DND override list, so *every* message bypasses
-Do Not Disturb. This fork replaces that with Android's native "starred contacts can interrupt" rule:
-only contacts you've **Favorited** in your Android contacts app ring through DND; everyone else respects
-it. Opt-in, off by default, under Settings → Notification Settings → **Override DND for Favorites**.
-See [setup](#do-not-disturb-bypass-setup) below.
+Do Not Disturb. This fork uses Android's native "starred contacts can interrupt" rule instead: only
+contacts you've **Favorited** in your Android contacts app ring through DND, and everyone else respects it.
+Opt-in, off by default, under Settings → Notification Settings → **Override DND for Favorites**.
+See [setup](#do-not-disturb-bypass-setup) below. Offered upstream as
+[#3064](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3064).
 
-### 2. Larger Android heap
-`android:largeHeap="true"` for extra memory headroom on message-heavy devices.
+### 2. Notification provider control  *(new in dnd.7.0)*
+If you receive notifications through **UnifiedPush / ntfy** (or run the always-on background service)
+instead of Firebase, you can now turn Firebase off cleanly:
+- A **"Use Firebase (FCM)"** toggle (Settings → Notification Providers → Google Firebase). Turn it off and
+  the app stops registering with Firebase, so you no longer get the spurious "Failed to register FCM
+  device" banner for a channel you don't use.
+  ([#3163](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3163))
+- **"Clear Configurations" now actually sticks.** Previously the Firebase config could reload and
+  re-register itself after a clear; that is fixed.
+  ([#3164](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3164),
+  [#3165](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3165))
 
-### 3. Reliability fixes ahead of the next release
-Fixes that aren't in a shipped release yet. Beyond DND, the theme is "messages are less likely to
-silently vanish." All are offered upstream as PRs, so this list shrinks as they merge:
+### 3. Reliability fixes ahead of the next official release
+Fixes that aren't in a shipped upstream build yet. The theme is "messages are less likely to silently
+vanish." All are offered upstream as PRs, so this list shrinks as they merge:
 
 | What you get | Upstream PR |
 |---|---|
 | Incoming messages don't silently go missing (a null field in a message could drop it on arrival) | [#3131](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3131) |
-| Reliable push via UnifiedPush/ntfy, attachments included (large pushes could fail to arrive) | [#3132](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3132) |
+| Reliable push via UnifiedPush / ntfy, attachments included (large pushes could fail to arrive) | [#3132](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3132) |
 | Group chats stop losing messages or hanging on a loading spinner (stale participant list) | [#3062](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3062) |
 | Desktop notifications show in the narrow single-pane window (otherwise you'd get none there) | [#3071](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3071) |
-| No crash building a notification for a portrait contact photo | [#3133](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3133) |
+| No crash when a message arrives before the conversation view finishes loading | [#3161](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3161) |
 
-The DND feature is also up as [#3064](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3064);
-if it lands, the fork reduces to little more than the `largeHeap` tweak.
+### 4. Larger Android heap
+`android:largeHeap="true"` for extra memory headroom on message-heavy devices.
 
 ## Installing
 
