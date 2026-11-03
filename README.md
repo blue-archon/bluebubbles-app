@@ -14,12 +14,13 @@ latest upstream code (currently upstream `master` at 2.1.5, which includes every
 Android releases), so you also get BlueBubbles' newest work before it reaches the Play Store, Microsoft Store, or
 Flathub. Everything here
 that isn't fork-specific is offered upstream as a pull request, so the fork shrinks as those land. The FCM
-on/off toggle, the "Clear Configurations" fix, the desktop narrow-window notification fix and the null-field
-dropped-message fix this fork used to carry are now in upstream
+on/off toggle, the "Clear Configurations" fix, the desktop narrow-window notification fix, the null-field
+dropped-message fix and the message-before-view crash fix this fork used to carry are now in upstream
 ([#3163](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3163),
 [#3164](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3164),
 [#3071](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3071),
-[#3131](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3131)), so they are part of the base for
+[#3131](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3131),
+[#3161](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3161)), so they are part of the base for
 everyone and no longer carried here.
 
 ## Features
@@ -34,13 +35,14 @@ See [setup](#do-not-disturb-bypass-setup) below. Offered upstream as
 
 ### 2. Reliability fixes ahead of the next official release
 Fixes that aren't in a shipped upstream build yet. The theme is "messages are less likely to silently
-vanish." All are offered upstream as PRs, so this list shrinks as they merge:
+vanish." All are upstream PRs, so this list shrinks as they merge:
 
 | What you get | Upstream PR |
 |---|---|
+| Links stay in the chat: since 2.1.3, a link disappeared from its conversation as soon as its preview loaded | pending |
 | UnifiedPush / ntfy: photos and other attachments notify again (they could be silently dropped), and a malformed push no longer drops the notification | [#3132](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3132) |
 | Group chats stop losing messages or hanging on a loading spinner (stale participant list) | [#3062](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3062) |
-| No crash when a message arrives before the conversation view finishes loading | [#3161](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3161) |
+| Android: no half-blank screen where the keyboard was after resuming the app (maintainer's fix, carried until it merges) | [#3392](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3392) |
 
 ### 3. Larger Android heap
 `android:largeHeap="true"` for extra memory headroom on message-heavy devices.
