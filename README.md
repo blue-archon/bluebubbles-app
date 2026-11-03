@@ -39,7 +39,7 @@ vanish." All are upstream PRs, so this list shrinks as they merge:
 
 | What you get | Upstream PR |
 |---|---|
-| Links stay in the chat: since 2.1.3, a link disappeared from its conversation as soon as its preview loaded. Links that already went missing are restored automatically shortly after the first launch | [#3401](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3401), [#3402](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3402) |
+| Links stay in the chat: since 2.1.3, a link disappeared from its conversation as soon as its preview loaded. Links that already went missing are restored automatically shortly after the first launch | [#3401](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3401), [#3403](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3403) |
 | UnifiedPush / ntfy: photos and other attachments notify again (they could be silently dropped), and a malformed push no longer drops the notification | [#3132](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3132) |
 | Group chats stop losing messages or hanging on a loading spinner (stale participant list) | [#3062](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3062) |
 | Android: no half-blank screen where the keyboard was after resuming the app (maintainer's fix, carried until it merges) | [#3392](https://github.com/BlueBubblesApp/bluebubbles-app/pull/3392) |
